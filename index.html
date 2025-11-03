@@ -83,6 +83,7 @@ time{font-variant-numeric:tabular-nums}
       <div class="row"><input id="city" placeholder="City / Label (optional)"/></div>
       <div class="row"><input id="lat" placeholder="Latitude"/><input id="lng" placeholder="Longitude"/><button id="apply">Apply</button></div>
       <div class="small">Runs offline. For GPS auto-detect, use HTTPS/localhost (GitHub Pages works great).</div>
+      <div id="debug" style="padding:8px;font-size:13px;color:#9aa4b2;"></div>
     </div>
   </section>
 </div>
@@ -157,10 +158,27 @@ $('useManual').onclick=()=>$('lat').focus();
 $('useGeo').onclick=()=>{
  if(!navigator.geolocation){alert('Geolocation not supported');return;}
  navigator.geolocation.getCurrentPosition(
-  p=>{const {latitude:lat,longitude:lng}=p.coords;const label='My Location';localStorage.setItem(LS_KEY,JSON.stringify({lat,lng,label}));update(lat,lng,label);},
-  ()=>alert('Could not get location. Enter manually.'),
+  p=>{
+    const {latitude:lat, longitude:lng, accuracy} = p.coords;
+    const label = 'My Location';
+    localStorage.setItem(LS_KEY, JSON.stringify({lat, lng, label}));
+    update(lat, lng, label);
+
+    // === Debug readout ===
+    const dbg = document.getElementById('debug');
+    if (dbg) {
+      dbg.textContent =
+        `Detected: lat ${lat.toFixed(5)}, lng ${lng.toFixed(5)} (±${Math.round(accuracy)} m)` +
+        (accuracy > 1000 ? ' ⚠️ Possibly VPN / coarse IP-based' : '');
+    }
+  },
+  err=>{
+    console.error('Geolocation error:', err);
+    alert('Could not get location. Try manual entry.');
+  },
   {enableHighAccuracy:true,timeout:10000,maximumAge:60000}
- );
+);
+
 };
 
 // Boot
