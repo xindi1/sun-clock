@@ -1,0 +1,23 @@
+{
+  "name": "Sun Clock — 24h Clock + Sunrise / Sunset",
+  "short_name": "Sun Clock",
+  "description": "Local time, today’s sunrise & sunset, and a live countdown to the next event.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b1b3d",
+  "theme_color": "#0b1b3d",
+  "icons": [
+    {
+      "src": "icons/sunclock-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/sunclock-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

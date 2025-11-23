@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Sun Clock — 24h Clock + Sunrise / Sunset</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root {
+      --bg: #0b1b3d;
+      --panel: #0f172a;
+      --card: #020617;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --border: #1f2937;
+      --accent: #60a5fa;
+      --accent-soft: #1d355c;
+      --badge: #111827;
+    }
+    html[data-theme="light"] {
+      --bg: #e5f0ff;
+      --panel: #ffffff;
+      --card: #f1f5f9;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #cbd5e1;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --badge: #e2e8f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #1e293b 0, var(--bg) 45%, #020617 90%);
+      color: var(--text);
+      padding: 16px;
+    }
+    html[data-theme="light"] body {
+      background: radial-gradient(circle at top, #dbeafe 0, #eff6ff 40%, #e2e8f0 90%);
+    }
+    .shell {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    .card {
+      background: var(--panel);
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      box-shadow: 0 14px 30px rgba(15,23,42,0.4);
+      padding: 16px 18px 18px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .subtitle {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .theme-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 3px 6px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      font-size: 0.72rem;
+    }
+    .theme-toggle button {
+      border-radius: 999px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      padding: 3px 9px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .theme-toggle button.active {
+      background: var(--accent);
+      color: #ffffff;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1.1fr 1.1fr;
+      gap: 12px;
+      margin-top: 10px;
+    }
+    @media (max-width: 840px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .subcard {
+      background: var(--card);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      padding: 12px 12px 13px;
+      min-height: 120px;
+    }
+    .label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+    .big {
+      font-size: 2.4rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+    .small {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 6px;
+    }
+    .kv {
+      margin-top: 6px;
+    }
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+      font-size: 0.72rem;
+    }
+    .pill {
+      border-radius: 999px;
+      padding: 2px 8px;
+      border: 1px solid var(--border);
+      background: var(--badge);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .progress {
+      margin-top: 8px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(148,163,184,0.4);
+      overflow: hidden;
+    }
+    .progress .bar {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width 0.4s ease;
+    }
+    .settings {
+      margin-top: 14px;
+      border-radius: 14px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 10px 12px 12px;
+    }
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    @media (max-width: 720px) {
+      .settings-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 520px) {
+      .settings-grid { grid-template-columns: 1fr; }
+    }
+    input, button {
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      padding: 6px 8px;
+      font-size: 0.84rem;
+      font-family: inherit;
+    }
+    input {
+      width: 100%;
+    }
+    input::placeholder {
+      color: var(--muted);
+    }
+    button {
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: transparent;
+    }
+    .btn-secondary {
+      background: var(--card);
+      color: var(--text);
+    }
+    .coord-wrap {
+      display: flex;
+      gap: 4px;
+    }
+    .coord-wrap input {
+      flex: 1;
+    }
+    .badge-toggle {
+      min-width: 40px;
+      text-align: center;
+      padding-inline: 6px;
+      font-size: 0.78rem;
+      background: var(--badge);
+    }
+    .settings-actions {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .help {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="card">
+      <header>
+        <div>
+          <h1>Sun Clock — 24h Clock + Sunrise / Sunset</h1>
+          <div class="subtitle">
+            Local time, today’s sunrise & sunset, and a live countdown to the next event.
+          </div>
+        </div>
+        <div class="theme-toggle" id="themeToggle">
+          <span>Theme</span>
+          <button type="button" data-theme="blue" class="active">Blue</button>
+          <button type="button" data-theme="light">Light</button>
+        </div>
+      </header>
+
+      <div class="grid">
+        <!-- Current Time -->
+        <div class="subcard">
+          <div class="label">Current time</div>
+          <div class="big" id="nowClock">--:--:--</div>
+          <div class="kv">
+            <div class="small" id="nowDate">—</div>
+            <div class="small" id="tzLabel">—</div>
+          </div>
+          <div class="pill-row">
+            <div class="pill">24-hour</div>
+            <div class="pill">Seconds visible</div>
+          </div>
+        </div>
+
+        <!-- Sunrise / Sunset -->
+        <div class="subcard">
+          <div class="label">Today’s sun</div>
+          <div class="row">
+            <div>
+              <div class="small">Sunrise</div>
+              <div style="font-size: 1.4rem; font-weight: 700; font-variant-numeric: tabular-nums" id="sunriseTime">--:--:--</div>
+            </div>
+            <div>
+              <div class="small">Sunset</div>
+              <div style="font-size: 1.4rem; font-weight: 700; font-variant-numeric: tabular-nums" id="sunsetTime">--:--:--</div>
+            </div>
+          </div>
+          <div class="kv">
+            <div class="small">Day length</div>
+            <div class="small" id="dayLength">—</div>
+          </div>
+          <div class="kv">
+            <div class="small">Location</div>
+            <div class="small" id="locLabel">—</div>
+          </div>
+        </div>
+
+        <!-- Next Event + Countdown -->
+        <div class="subcard">
+          <div class="label">Next event</div>
+          <div class="row">
+            <div style="font-size: 1.2rem; font-weight: 600" id="nextEventLabel">—</div>
+            <div style="font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums" id="nextEventTime">--:--:--</div>
+          </div>
+          <div class="kv" style="margin-top: 10px;">
+            <div class="small">Countdown</div>
+            <div style="font-variant-numeric: tabular-nums; font-size: 1.4rem; font-weight: 700" id="countdownHms">00:00:00</div>
+            <div class="small" id="countdownText" style="margin-top: 2px;">—</div>
+          </div>
+          <div class="progress">
+            <div class="bar" id="dayProgress"></div>
+          </div>
+          <div class="kv">
+            <div class="small" id="nextEventNote" style="margin-top: 4px;">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Location settings -->
+      <div class="settings">
+        <div class="label">Location settings</div>
+        <div class="settings-grid">
+          <div>
+            <div class="label">Label (optional)</div>
+            <input id="labelInput" placeholder="e.g., Charlotte, NC" />
+          </div>
+          <div>
+            <div class="label">Latitude</div>
+            <div class="coord-wrap">
+              <input id="latInput" type="number" step="0.0001" placeholder="35.2106" />
+              <button id="latHemi" type="button" class="badge-toggle">N</button>
+            </div>
+          </div>
+          <div>
+            <div class="label">Longitude</div>
+            <div class="coord-wrap">
+              <input id="lngInput" type="number" step="0.0001" placeholder="80.8021" />
+              <button id="lngHemi" type="button" class="badge-toggle">W</button>
+            </div>
+          </div>
+        </div>
+        <div class="settings-actions">
+          <button id="applyBtn" type="button" class="btn-primary">Apply</button>
+          <button id="gpsBtn" type="button" class="btn-secondary">Use my location</button>
+        </div>
+        <div class="help" id="infoText">
+          Coords are absolute values; hemisphere buttons set N/S and E/W. Data stays in this browser only.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== Theme toggle =====
+    (function initTheme() {
+      const key = 'sunclock_theme_simple';
+      const saved = localStorage.getItem(key) || 'blue';
+      document.documentElement.dataset.theme = saved === 'light' ? 'light' : 'blue';
+
+      const toggle = document.getElementById('themeToggle');
+      const buttons = toggle.querySelectorAll('button');
+
+      function updateActive(mode) {
+        buttons.forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.theme === mode);
+        });
+      }
+
+      updateActive(saved);
+
+      buttons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const mode = btn.dataset.theme;
+          document.documentElement.dataset.theme = mode;
+          localStorage.setItem(key, mode);
+          updateActive(mode);
+        });
+      });
+    })();
+
+    // ===== Simple SunCalc (same core math, trimmed) =====
+    const SunCalc = (function(){
+      const PI = Math.PI, rad = PI / 180;
+
+      function toJulian(date) { return date.valueOf()/86400000 - 0.5 + 2440588; }
+      function fromJulian(j) { return new Date((j + 0.5 - 2440588)*86400000); }
+      function toDays(date) { return toJulian(date) - 2451545; }
+
+      function solarMeanAnomaly(d) { return rad*(357.5291 + 0.98560028*d); }
+      function eclipticLongitude(M) {
+        const C = rad*(1.9148*Math.sin(M) + 0.02*Math.sin(2*M) + 0.0003*Math.sin(3*M));
+        const P = rad*102.9372;
+        return M + C + P + PI;
+      }
+      const e = rad*23.4397;
+      function declination(L, b=0) {
+        return Math.asin(Math.sin(b)*Math.cos(e) + Math.cos(b)*Math.sin(e)*Math.sin(L));
+      }
+      function julianCycle(d, lw) { return Math.round(d - 0.0009 - lw/(2*Math.PI)); }
+      function approxTransit(Ht, lw, n) { return 0.0009 + (Ht + lw)/(2*Math.PI) + n; }
+      function solarTransitJ(ds, M, L) {
+        return 2451545 + ds + 0.0053*Math.sin(M) - 0.0069*Math.sin(2*L);
+      }
+
+      function getTimes(date, lat, lng) {
+        const lw = -lng*rad, phi = lat*rad;
+        const d = toDays(date);
+        const n = julianCycle(d, lw);
+        const ds = approxTransit(0, lw, n);
+        const M = solarMeanAnomaly(ds);
+        const L = eclipticLongitude(M);
+        const dec = declination(L);
+        const Jnoon = solarTransitJ(ds, M, L);
+
+        const h0 = -0.833*rad; // degrees for sunrise/sunset
+        const w = Math.acos((Math.sin(h0) - Math.sin(phi)*Math.sin(dec)) / (Math.cos(phi)*Math.cos(dec)));
+        const a = approxTransit(w, lw, n);
+        const Jset = solarTransitJ(a, M, L);
+        const Jrise = Jnoon - (Jset - Jnoon);
+
+        return {
+          sunrise: fromJulian(Jrise),
+          sunset: fromJulian(Jset),
+          solarNoon: fromJulian(Jnoon)
+        };
+      }
+
+      return { getTimes };
+    })();
+
+    // ===== App state =====
+    const LS_KEY = 'sunclock_simple_coords';
+    const $ = id => document.getElementById(id);
+
+    let currentLocation = {
+      lat: 35.2106,
+      lng: -80.8021,
+      label: 'My Location'
+    };
+    let todayTimes = null;
+    let nextEvent = null; // Date
+    let nextEventLabel = '';
+
+    // ===== Helpers =====
+    function loadCoords() {
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (!raw) return;
+        const obj = JSON.parse(raw);
+        if (typeof obj.lat === 'number' && typeof obj.lng === 'number') {
+          currentLocation = {
+            lat: obj.lat,
+            lng: obj.lng,
+            label: obj.label || 'My Location'
+          };
+        }
+      } catch (_) {}
+    }
+
+    function saveCoords() {
+      localStorage.setItem(LS_KEY, JSON.stringify(currentLocation));
+    }
+
+    function pad2(n) { return String(n).padStart(2, '0'); }
+
+    function fmtTime(date) {
+      // 24-hour time with seconds
+      return `${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+    }
+
+    function fmtDateNice(date) {
+      const y = date.getFullYear();
+      const m = date.getMonth() + 1;
+      const d = date.getDate();
+      return `${y}-${pad2(m)}-${pad2(d)}`;
+    }
+
+    function dayLengthString(sunrise, sunset) {
+      const ms = sunset - sunrise;
+      const h = Math.floor(ms / 3600000);
+      const m = Math.round((ms % 3600000) / 60000);
+      return `${h}h ${m}m`;
+    }
+
+    function hemi(val, pos, neg) {
+      const sign = val >= 0 ? pos : neg;
+      return `${Math.abs(val).toFixed(4)}° ${sign}`;
+    }
+
+    function signedFromInputs(value, hemiChar) {
+      const v = Math.abs(parseFloat(value) || 0);
+      if (hemiChar === 'S' || hemiChar === 'W') return -v;
+      return v;
+    }
+
+    function computeTodayTimes() {
+      const now = new Date();
+      todayTimes = SunCalc.getTimes(now, currentLocation.lat, currentLocation.lng);
+    }
+
+    function computeNextEvent() {
+      const now = new Date();
+      const { sunrise, sunset } = todayTimes;
+      if (now < sunrise) {
+        nextEvent = sunrise;
+        nextEventLabel = 'Sunrise';
+      } else if (now < sunset) {
+        nextEvent = sunset;
+        nextEventLabel = 'Sunset';
+      } else {
+        // Use tomorrow's sunrise
+        const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        const tTimes = SunCalc.getTimes(tomorrow, currentLocation.lat, currentLocation.lng);
+        nextEvent = tTimes.sunrise;
+        nextEventLabel = 'Sunrise';
+      }
+    }
+
+    // ===== UI update =====
+    function updateStaticUI() {
+      // Timezone & date
+      const now = new Date();
+      $('tzLabel').textContent =
+        Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local time';
+      $('nowDate').textContent = fmtDateNice(now);
+
+      // Sunrise / sunset
+      if (!todayTimes) return;
+      $('sunriseTime').textContent = fmtTime(todayTimes.sunrise);
+      $('sunsetTime').textContent  = fmtTime(todayTimes.sunset);
+      $('dayLength').textContent   = dayLengthString(todayTimes.sunrise, todayTimes.sunset);
+      $('locLabel').textContent    =
+        currentLocation.label ||
+        `${hemi(currentLocation.lat, 'N', 'S')}, ${hemi(currentLocation.lng, 'E', 'W')}`;
+
+      // Next event static bits
+      if (nextEvent) {
+        $('nextEventLabel').textContent = nextEventLabel;
+        $('nextEventTime').textContent  = fmtTime(nextEvent);
+        $('nextEventNote').textContent  =
+          `${nextEventLabel} at ${fmtTime(nextEvent)} on ${fmtDateNice(nextEvent)}`;
+      } else {
+        $('nextEventLabel').textContent = '—';
+        $('nextEventTime').textContent  = '--:--:--';
+        $('nextEventNote').textContent  = '—';
+      }
+    }
+
+    function updateDynamicUI() {
+      const now = new Date();
+      $('nowClock').textContent = fmtTime(now);
+
+      // If no next event or we've passed it, recompute
+      if (!nextEvent || (now.getTime() > nextEvent.getTime() + 1000)) {
+        computeTodayTimes();
+        computeNextEvent();
+        updateStaticUI();
+      }
+
+      if (!nextEvent) {
+        $('countdownHms').textContent = "00:00:00";
+        $('countdownText').textContent = "—";
+        $('dayProgress').style.width = "0%";
+        return;
+      }
+
+      const diffMs = nextEvent.getTime() - now.getTime();
+      const sign = diffMs >= 0 ? 1 : -1;
+      const absMs = Math.abs(diffMs);
+      const totalSeconds = Math.floor(absMs / 1000);
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+
+      $('countdownHms').textContent = `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+      if (sign > 0) {
+        // "in Xh Ym"
+        let text = "in ";
+        if (h) text += `${h}h `;
+        if (m || (!h && m === 0)) text += `${m}m `;
+        $('countdownText').textContent = text.trim();
+      } else {
+        $('countdownText').textContent = "event has passed · recalculating soon";
+      }
+
+      // Daylight progress
+      if (todayTimes && now >= todayTimes.sunrise && now <= todayTimes.sunset) {
+        const pct = ((now - todayTimes.sunrise) / (todayTimes.sunset - todayTimes.sunrise)) * 100;
+        $('dayProgress').style.width = Math.min(100, Math.max(0, pct)).toFixed(1) + "%";
+      } else if (todayTimes) {
+        // Before sunrise = 0%, after sunset = 100%
+        $('dayProgress').style.width = (now < todayTimes.sunrise) ? "0%" : "100%";
+      } else {
+        $('dayProgress').style.width = "0%";
+      }
+    }
+
+    // ===== Location form wiring =====
+    function syncFormFromLocation() {
+      $('labelInput').value = currentLocation.label || '';
+      $('latInput').value   = Math.abs(currentLocation.lat).toFixed(4);
+      $('lngInput').value   = Math.abs(currentLocation.lng).toFixed(4);
+      $('latHemi').textContent = currentLocation.lat >= 0 ? 'N' : 'S';
+      $('lngHemi').textContent = currentLocation.lng >= 0 ? 'E' : 'W';
+    }
+
+    function applyFromForm() {
+      const latVal = $('latInput').value;
+      const lngVal = $('lngInput').value;
+      const latH   = $('latHemi').textContent.trim();
+      const lngH   = $('lngHemi').textContent.trim();
+      const label  = $('labelInput').value.trim();
+
+      const lat = signedFromInputs(latVal, latH);
+      const lng = signedFromInputs(lngVal, lngH);
+
+      if (!isFinite(lat) || !isFinite(lng)) {
+        $('infoText').textContent = 'Please provide valid latitude and longitude.';
+        return;
+      }
+      currentLocation = {
+        lat,
+        lng,
+        label: label || 'My Location'
+      };
+      saveCoords();
+      computeTodayTimes();
+      computeNextEvent();
+      updateStaticUI();
+      $('infoText').textContent = 'Location applied.';
+    }
+
+    function initGPS() {
+      if (!navigator.geolocation) {
+        $('infoText').textContent = 'Geolocation not available in this browser.';
+        return;
+      }
+      $('infoText').textContent = 'Detecting your location…';
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          currentLocation = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            label: 'My Location'
+          };
+          saveCoords();
+          syncFormFromLocation();
+          computeTodayTimes();
+          computeNextEvent();
+          updateStaticUI();
+          $('infoText').textContent =
+            `Detected lat ${currentLocation.lat.toFixed(4)}, lng ${currentLocation.lng.toFixed(4)} (±${Math.round(pos.coords.accuracy)}m)`;
+        },
+        err => {
+          $('infoText').textContent = 'Geolocation error: ' + err.message;
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    // ===== Init =====
+    document.addEventListener('DOMContentLoaded', () => {
+      loadCoords();
+      syncFormFromLocation();
+      computeTodayTimes();
+      computeNextEvent();
+      updateStaticUI();
+      updateDynamicUI();
+
+      // wire controls
+      $('latHemi').addEventListener('click', () => {
+        $('latHemi').textContent = $('latHemi').textContent === 'N' ? 'S' : 'N';
+      });
+      $('lngHemi').addEventListener('click', () => {
+        $('lngHemi').textContent = $('lngHemi').textContent === 'E' ? 'W' : 'E';
+      });
+      $('applyBtn').addEventListener('click', applyFromForm);
+      $('gpsBtn').addEventListener('click', initGPS);
+
+      // main loop: 250 ms refresh for smooth seconds
+      setInterval(updateDynamicUI, 250);
+    });
+  </script>
+</body>
+</html>
