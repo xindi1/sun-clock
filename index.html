@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Sun Clock</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0b1b3d">
+  <meta name="description" content="A daylight & seasonal time instrument built around sunrise, sunset, and the arc of the year." />
+  <!-- If you host as a PWA, add these files next to this HTML:
+       - manifest.webmanifest
+       - sw.js
+       - icons (192/512)
+  -->
+  <style>
+    :root{
+      --bg:#0b1b3d;
+      --panel:#0f172a;
+      --card:#020617;
+      --text:#e5e7eb;
+      --muted:#9ca3af;
+      --border:#1f2937;
+      --accent:#60a5fa;
+      --badge:#111827;
+
+      --g-night: radial-gradient(circle at top, #020617 0, #020617 45%, #000000 90%);
+      --g-dawn:  radial-gradient(circle at top, #1e293b 0, #0b1b3d 45%, #020617 90%);
+      --g-day:   radial-gradient(circle at top, #1d4ed8 0, #0b1b3d 45%, #020617 90%);
+      --g-dusk:  radial-gradient(circle at top, #7c2d12 0, #0b1b3d 45%, #020617 90%);
+    }
+    html[data-theme="light"]{
+      --bg:#e5f0ff;
+      --panel:#ffffff;
+      --card:#f1f5f9;
+      --text:#0f172a;
+      --muted:#64748b;
+      --border:#cbd5e1;
+      --accent:#2563eb;
+      --badge:#e2e8f0;
+
+      --g-night: radial-gradient(circle at top, #020617 0, #020617 45%, #020617 90%);
+      --g-dawn:  radial-gradient(circle at top, #dbeafe 0, #e5f0ff 45%, #e2e8f0 90%);
+      --g-day:   radial-gradient(circle at top, #bfdbfe 0, #eff6ff 45%, #e2e8f0 90%);
+      --g-dusk:  radial-gradient(circle at top, #fed7aa 0, #fee2e2 45%, #e2e8f0 90%);
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color:var(--text);
+      background:var(--g-dawn);
+      padding:16px;
+      transition:background .6s ease;
+    }
+    body.phase-night{background:var(--g-night)}
+    body.phase-dawn{background:var(--g-dawn)}
+    body.phase-day{background:var(--g-day)}
+    body.phase-dusk{background:var(--g-dusk)}
+
+    .shell{max-width:980px;margin:0 auto}
+    .frame{
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:20px;
+      box-shadow:0 14px 30px rgba(15,23,42,.35);
+      padding:16px 18px 18px;
+    }
+    header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:10px;
+    }
+    h1{
+      margin:0;
+      font-size:1.15rem;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    .sub{
+      margin-top:3px;
+      font-size:.82rem;
+      color:var(--muted);
+    }
+
+    .theme-toggle{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      border-radius:999px;
+      padding:3px 6px;
+      background:var(--card);
+      border:1px solid var(--border);
+      font-size:.72rem;
+    }
+    .theme-toggle span{padding-left:4px;color:var(--muted)}
+    .theme-toggle button{
+      border-radius:999px;
+      border:none;
+      background:transparent;
+      color:var(--muted);
+      padding:3px 10px;
+      font-size:.72rem;
+      cursor:pointer;
+      font-family:inherit;
+    }
+    .theme-toggle button.active{background:var(--accent);color:#fff}
+
+    .seg{
+      display:flex;
+      gap:6px;
+      background:rgba(15,23,42,.9);
+      border-radius:999px;
+      padding:3px;
+      border:1px solid var(--border);
+      margin:6px 0 12px;
+    }
+    html[data-theme="light"] .seg{background:rgba(255,255,255,.95)}
+    .seg button{
+      flex:1;
+      border:none;
+      border-radius:999px;
+      padding:7px 10px;
+      font-size:.85rem;
+      cursor:pointer;
+      color:var(--muted);
+      background:transparent;
+    }
+    .seg button.active{background:var(--accent);color:#fff}
+
+    .view{display:none}
+    .view.active{display:block}
+
+    .grid{
+      display:grid;
+      grid-template-columns:1.1fr 1.1fr 1fr;
+      gap:12px;
+    }
+    @media(max-width:860px){.grid{grid-template-columns:1fr}}
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:12px 12px 13px;
+      min-height:120px;
+    }
+    .label{
+      font-size:.78rem;
+      color:var(--muted);
+      margin-bottom:4px;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+    }
+    .big{
+      font-size:2.35rem;
+      font-weight:850;
+      letter-spacing:.04em;
+      font-variant-numeric:tabular-nums;
+    }
+    .mono{font-variant-numeric:tabular-nums;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+    .row{
+      display:flex;
+      justify-content:space-between;
+      align-items:baseline;
+      gap:12px;
+      margin-top:6px;
+    }
+    .small{font-size:.8rem;color:var(--muted)}
+    .hr{height:1px;background:rgba(148,163,184,.28);margin:10px 0;border-radius:999px}
+
+    .progress{
+      margin-top:8px;
+      height:9px;
+      border-radius:999px;
+      background:rgba(148,163,184,.35);
+      position:relative;
+      overflow:hidden;
+    }
+    .segm{position:absolute;top:0;height:100%}
+    .seg-blue{background:rgba(59,130,246,.45)}
+    .seg-golden{background:rgba(251,191,36,.65)}
+    .seg-day{background:rgba(148,163,184,.35)}
+    .marker{position:absolute;top:-2px;bottom:-2px;width:2px;border-radius:999px;background:var(--text);opacity:.9}
+
+    .settings{
+      margin-top:14px;
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:10px 12px 12px;
+    }
+    .settings-grid{
+      display:grid;
+      grid-template-columns:1.2fr 1fr 1fr;
+      gap:8px;
+      margin-top:8px;
+    }
+    @media(max-width:740px){.settings-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:520px){.settings-grid{grid-template-columns:1fr}}
+    input, button{
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:var(--panel);
+      color:var(--text);
+      padding:7px 9px;
+      font-size:.86rem;
+      font-family:inherit;
+    }
+    input{width:100%}
+    input::placeholder{color:var(--muted)}
+    button{cursor:pointer}
+    .btn-primary{background:var(--accent);border-color:transparent;color:#fff}
+    .btn-secondary{background:var(--panel)}
+    .coord{
+      display:flex;
+      gap:6px;
+      align-items:center;
+    }
+    .coord input{flex:1}
+    .badge{
+      min-width:44px;
+      padding-inline:10px;
+      text-align:center;
+      background:var(--badge);
+      color:var(--muted);
+    }
+    .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .help{font-size:.74rem;color:var(--muted);margin-top:6px;line-height:1.35}
+
+    /* Seasons */
+    .season-bar{
+      position:relative;
+      height:10px;
+      border-radius:999px;
+      background: linear-gradient(90deg, #0f172a, #60a5fa, #22c55e, #fbbf24, #f97316, #991b1b);
+      margin-top:8px;
+      overflow:hidden;
+      border:1px solid rgba(148,163,184,.25);
+    }
+    .season-marker{position:absolute;top:-3px;bottom:-3px;width:2px;border-radius:999px;background:#fff}
+    .meta{margin-top:10px}
+    .meta div{margin-top:4px}
+    .footer{
+      margin-top:12px;
+      padding-top:10px;
+      border-top:1px solid rgba(148,163,184,.28);
+      display:flex;
+      flex-wrap:wrap;
+      justify-content:space-between;
+      gap:8px;
+      font-size:.78rem;
+      color:var(--muted);
+    }
+    .footer strong{color:var(--text);font-weight:650}
+    .link{
+      color:var(--accent);
+      text-decoration:none;
+      border-bottom:1px dashed rgba(96,165,250,.55);
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="frame">
+      <header>
+        <div>
+          <h1>Sun Clock</h1>
+          <div class="sub">A daylight & seasonal time instrument built around the sun.</div>
+        </div>
+        <div class="theme-toggle" id="themeToggle">
+          <span>Theme</span>
+          <button type="button" data-theme="blue" class="active">Blue</button>
+          <button type="button" data-theme="light">Light</button>
+        </div>
+      </header>
+
+      <nav class="seg" aria-label="Views">
+        <button type="button" class="active" data-view="sun">Sun</button>
+        <button type="button" data-view="seasons">Seasons</button>
+      </nav>
+
+      <!-- SUN VIEW -->
+      <section class="view active" id="view-sun">
+        <div class="grid">
+          <div class="card">
+            <div class="label">Current time</div>
+            <div class="big mono" id="nowClock">--:--:--</div>
+            <div class="small" id="nowDate">—</div>
+            <div class="small" id="tzLabel">—</div>
+          </div>
+
+          <div class="card">
+            <div class="label">Today’s sun</div>
+            <div class="row">
+              <div>
+                <div class="small">Sunrise</div>
+                <div class="mono" style="font-size:1.45rem;font-weight:750" id="sunriseTime">--:--:--</div>
+              </div>
+              <div style="text-align:right;">
+                <div class="small">Sunset</div>
+                <div class="mono" style="font-size:1.45rem;font-weight:750" id="sunsetTime">--:--:--</div>
+              </div>
+            </div>
+            <div class="hr"></div>
+            <div class="row">
+              <div class="small">Day length</div>
+              <div class="small mono" id="dayLength">—</div>
+            </div>
+            <div class="row">
+              <div class="small">Tomorrow vs today</div>
+              <div class="small mono" id="dayTrend">—</div>
+            </div>
+            <div class="row">
+              <div class="small">Golden hour</div>
+              <div class="small mono" id="goldenHours">—</div>
+            </div>
+            <div class="row">
+              <div class="small">Blue hour</div>
+              <div class="small mono" id="blueHours">—</div>
+            </div>
+            <div class="row">
+              <div class="small">Location</div>
+              <div class="small" id="locLabel">—</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="label">Next event</div>
+            <div class="row">
+              <div>
+                <div class="small">Type</div>
+                <div style="font-size:1.1rem;font-weight:650" id="nextEventLabel">—</div>
+              </div>
+              <div style="text-align:right;">
+                <div class="small">Time</div>
+                <div class="mono" style="font-size:1.55rem;font-weight:850" id="nextEventTime">--:--:--</div>
+              </div>
+            </div>
+            <div class="hr"></div>
+            <div class="small">Countdown</div>
+            <div class="mono" style="font-size:1.55rem;font-weight:850" id="countdownHms">00:00:00</div>
+            <div class="small" id="countdownText" style="margin-top:2px;">—</div>
+
+            <div class="progress" aria-label="Daylight bar">
+              <div class="segm seg-blue" id="blueBeforeSeg"></div>
+              <div class="segm seg-golden" id="goldenMorningSeg"></div>
+              <div class="segm seg-day" id="daySeg"></div>
+              <div class="segm seg-golden" id="goldenEveningSeg"></div>
+              <div class="segm seg-blue" id="blueAfterSeg"></div>
+              <div class="marker" id="timeMarker"></div>
+            </div>
+
+            <div class="help" id="nextEventNote">—</div>
+          </div>
+        </div>
+
+        <div class="settings">
+          <div class="label">Location & calibration</div>
+
+          <div class="settings-grid">
+            <div>
+              <div class="label" style="margin-bottom:6px;">Label (optional)</div>
+              <input id="labelInput" placeholder="e.g., Charlotte, NC" />
+            </div>
+            <div>
+              <div class="label" style="margin-bottom:6px;">Latitude</div>
+              <div class="coord">
+                <input id="latInput" type="number" step="0.0001" placeholder="35.2106" />
+                <button id="latHemi" type="button" class="badge">N</button>
+              </div>
+            </div>
+            <div>
+              <div class="label" style="margin-bottom:6px;">Longitude</div>
+              <div class="coord">
+                <input id="lngInput" type="number" step="0.0001" placeholder="80.8021" />
+                <button id="lngHemi" type="button" class="badge">W</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="applyBtn" type="button" class="btn-primary">Apply</button>
+            <button id="gpsBtn" type="button" class="btn-secondary">Use my location</button>
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="actions">
+            <button id="calibrateSunriseBtn" type="button" class="btn-secondary">Calibrate to Real Sunrise</button>
+            <button id="calibrateSunsetBtn" type="button" class="btn-secondary">Calibrate to Real Sunset</button>
+          </div>
+          <div class="help" id="calibrationStatus"></div>
+          <div class="help" id="infoText">
+            Tip: enter absolute values, then set hemisphere. Calibration is best within ±20 minutes of the real event.
+          </div>
+        </div>
+
+        <div class="footer">
+          <div><strong>Sun Clock</strong> · Commercial Build · v1.0</div>
+          <div>Sunrise · Sunset · Countdown · Seasons</div>
+        </div>
+      </section>
+
+      <!-- SEASONS VIEW -->
+      <section class="view" id="view-seasons">
+        <div class="card">
+          <div class="label">Seasonal daylight</div>
+          <div class="small">
+            Year view of daylight at your chosen coordinates (including any horizon calibration).
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="row">
+            <div class="small">Today’s day length</div>
+            <div class="mono" style="font-size:1.15rem;font-weight:750" id="seasonTodayLen">—</div>
+          </div>
+          <div class="row">
+            <div class="small">vs longest day</div>
+            <div class="small mono" id="seasonDeltaLongest">—</div>
+          </div>
+          <div class="row">
+            <div class="small">vs shortest day</div>
+            <div class="small mono" id="seasonDeltaShortest">—</div>
+          </div>
+
+          <div class="season-bar" aria-label="Year progress">
+            <div class="season-marker" id="seasonMarker"></div>
+          </div>
+
+          <div class="meta">
+            <div class="small" id="seasonLongestLabel">Longest day: —</div>
+            <div class="small" id="seasonShortestLabel">Shortest day: —</div>
+            <div class="small" id="seasonEquinoxLabel">Equinox (approx): —</div>
+          </div>
+
+          <div class="help">
+            Seasonal calculations are approximate and based on astronomical sunrise/sunset plus your calibration offset.
+          </div>
+        </div>
+
+        <div class="footer">
+          <div><strong>Sun Clock</strong> · Seasons</div>
+          <div><a class="link" href="#" id="backToSun">Back to Sun</a></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+<script>
+/* ========= THEME ========= */
+(function initTheme(){
+  const key='sunclock_theme_commercial';
+  const saved = localStorage.getItem(key) || 'blue';
+  document.documentElement.dataset.theme = saved === 'light' ? 'light' : 'blue';
+
+  const toggle = document.getElementById('themeToggle');
+  const buttons = toggle.querySelectorAll('button');
+  function setActive(mode){
+    buttons.forEach(b=>b.classList.toggle('active', b.dataset.theme===mode));
+  }
+  setActive(saved);
+
+  buttons.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const mode = btn.dataset.theme;
+      document.documentElement.dataset.theme = mode;
+      localStorage.setItem(key, mode);
+      setActive(mode);
+    });
+  });
+})();
+
+/* ========= SUNCALC (compact) ========= */
+const SunCalc = (function(){
+  const PI=Math.PI, rad=PI/180;
+  function toJulian(date){return date.valueOf()/86400000-0.5+2440588}
+  function fromJulian(j){return new Date((j+0.5-2440588)*86400000)}
+  function toDays(date){return toJulian(date)-2451545}
+  function solarMeanAnomaly(d){return rad*(357.5291+0.98560028*d)}
+  function eclipticLongitude(M){
+    const C = rad*(1.9148*Math.sin(M)+0.02*Math.sin(2*M)+0.0003*Math.sin(3*M));
+    const P = rad*102.9372;
+    return M + C + P + PI;
+  }
+  const e = rad*23.4397;
+  function declination(L,b=0){
+    return Math.asin(Math.sin(b)*Math.cos(e)+Math.cos(b)*Math.sin(e)*Math.sin(L));
+  }
+  function julianCycle(d,lw){return Math.round(d-0.0009-lw/(2*PI))}
+  function approxTransit(Ht,lw,n){return 0.0009+(Ht+lw)/(2*PI)+n}
+  function solarTransitJ(ds,M,L){return 2451545+ds+0.0053*Math.sin(M)-0.0069*Math.sin(2*L)}
+  function getTimes(date,lat,lng){
+    const lw=-lng*rad, phi=lat*rad;
+    const d=toDays(date);
+    const n=julianCycle(d,lw);
+    const ds=approxTransit(0,lw,n);
+    const M=solarMeanAnomaly(ds);
+    const L=eclipticLongitude(M);
+    const dec=declination(L);
+    const Jnoon=solarTransitJ(ds,M,L);
+    const h0=-0.833*rad; // sunrise/sunset altitude
+    const w=Math.acos((Math.sin(h0)-Math.sin(phi)*Math.sin(dec))/(Math.cos(phi)*Math.cos(dec)));
+    const a=approxTransit(w,lw,n);
+    const Jset=solarTransitJ(a,M,L);
+    const Jrise=Jnoon-(Jset-Jnoon);
+    return { sunrise: fromJulian(Jrise), sunset: fromJulian(Jset), solarNoon: fromJulian(Jnoon) };
+  }
+  return { getTimes };
+})();
+
+/* ========= STATE / STORAGE ========= */
+const LS_COORDS_KEY = 'sunclock_coords_commercial';
+const LS_HORIZON_KEY = 'sunclock_horizon_offset_commercial';
+const LS_SEASON_CACHE_KEY = 'sunclock_season_cache_v1';
+
+const $ = (id)=>document.getElementById(id);
+
+let currentLocation = { lat: 35.2106, lng: -80.8021, label: 'My Location' };
+let horizonOffsetMinutes = 0;
+
+let todayTimes=null, tomorrowTimes=null;
+let nextEvent=null, nextEventLabel='';
+let goldenBlueInfo=null;
+let phaseClass='';
+
+let seasonInfo=null;
+
+function loadCoords(){
+  try{
+    const raw = localStorage.getItem(LS_COORDS_KEY);
+    if(!raw) return;
+    const obj = JSON.parse(raw);
+    if(typeof obj.lat==='number' && typeof obj.lng==='number'){
+      currentLocation = { lat: obj.lat, lng: obj.lng, label: obj.label || 'My Location' };
+    }
+  }catch(_){}
+}
+function saveCoords(){
+  localStorage.setItem(LS_COORDS_KEY, JSON.stringify(currentLocation));
+}
+function loadHorizonOffset(){
+  try{
+    const raw = localStorage.getItem(LS_HORIZON_KEY);
+    if(raw!==null){
+      const val = parseInt(raw,10);
+      if(!isNaN(val)) horizonOffsetMinutes = val;
+    }
+  }catch(_){}
+}
+function saveHorizonOffset(){
+  localStorage.setItem(LS_HORIZON_KEY, String(horizonOffsetMinutes));
+}
+
+/* ========= HELPERS ========= */
+function pad2(n){return String(n).padStart(2,'0')}
+function now(){return new Date()}
+function fmtTime(d){return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`}
+function fmtTimeShort(d){return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`}
+function fmtDateNice(d){return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`}
+
+function hemi(val,pos,neg){return `${Math.abs(val).toFixed(4)}° ${val>=0?pos:neg}`}
+function signedFromInputs(v, hemiChar){
+  const n = Math.abs(parseFloat(v)||0);
+  return (hemiChar==='S' || hemiChar==='W') ? -n : n;
+}
+function minutesFrom(d, mins){return new Date(d.getTime()+mins*60000)}
+
+function msToDayLen(ms){
+  const h = Math.floor(ms/3600000);
+  const m = Math.round((ms%3600000)/60000);
+  return `${h}h ${m}m`;
+}
+function formatDelta(ms){
+  const sign = ms>=0?'+':'−';
+  const abs = Math.abs(ms);
+  const m = Math.floor(abs/60000);
+  const s = Math.round((abs%60000)/1000);
+  if(m===0 && s===0) return 'Same as today';
+  return `${sign}${m}m ${s}s daylight`;
+}
+
+function applyHorizon(times){
+  const off = horizonOffsetMinutes*60000;
+  return {
+    sunrise: new Date(times.sunrise.getTime()+off),
+    sunset: new Date(times.sunset.getTime()+off),
+    solarNoon: times.solarNoon
+  };
+}
+
+/* ========= SUN STATE ========= */
+function recomputeSunState(t){
+  const bufferMs = 500;
+  const events=[];
+  todayTimes=null; tomorrowTimes=null;
+
+  for(let off=-1; off<=2; off++){
+    const base = new Date(t.getFullYear(), t.getMonth(), t.getDate()+off);
+    const raw = SunCalc.getTimes(base, currentLocation.lat, currentLocation.lng);
+    const adj = applyHorizon(raw);
+    if(off===0) todayTimes=adj;
+    if(off===1) tomorrowTimes=adj;
+    events.push({label:'Sunrise', time: adj.sunrise});
+    events.push({label:'Sunset', time: adj.sunset});
+  }
+  const future = events.filter(e=>e.time.getTime() > t.getTime()+bufferMs);
+  if(!future.length){ nextEvent=null; nextEventLabel=''; return; }
+  let best = future[0];
+  for(let i=1;i<future.length;i++){ if(future[i].time < best.time) best=future[i]; }
+  nextEvent = best.time;
+  nextEventLabel = best.label;
+}
+
+function determinePhase(t){
+  if(!todayTimes) return 'day';
+  const sr=todayTimes.sunrise, ss=todayTimes.sunset;
+  const dawnStart=minutesFrom(sr,-30);
+  const dawnEnd=minutesFrom(sr,45);
+  const duskStart=minutesFrom(ss,-60);
+  const duskEnd=minutesFrom(ss,30);
+
+  if(t>=dawnStart && t<dawnEnd) return 'dawn';
+  if(t>=dawnEnd && t<duskStart) return 'day';
+  if(t>=duskStart && t<duskEnd) return 'dusk';
+  return 'night';
+}
+function setPhase(t){
+  const phase = determinePhase(t);
+  const cls = 'phase-'+phase;
+  if(cls===phaseClass) return;
+  if(phaseClass) document.body.classList.remove(phaseClass);
+  document.body.classList.add(cls);
+  phaseClass=cls;
+}
+
+/* ========= DAYLIGHT BAR ========= */
+function updateDaylightBar(t){
+  const ids=['blueBeforeSeg','goldenMorningSeg','daySeg','goldenEveningSeg','blueAfterSeg'];
+  if(!goldenBlueInfo){
+    ids.forEach(id=>{ const el=$(id); if(el){el.style.left='0%';el.style.width='0%';}});
+    const mk=$('timeMarker'); if(mk) mk.style.left='0%';
+    return;
+  }
+  const {bhAmStart, ghAmStart, ghAmEnd, ghPmStart, ghPmEnd, bhPmStart, bhPmEnd} = goldenBlueInfo;
+  const baseStart=bhAmStart, baseEnd=bhPmEnd;
+  const span=baseEnd-baseStart;
+  if(span<=0) return;
+
+  function setSeg(id, start, end){
+    const el=$(id); if(!el) return;
+    const s=Math.max(0,Math.min(1,(start-baseStart)/span));
+    const e=Math.max(0,Math.min(1,(end-baseStart)/span));
+    el.style.left=(s*100).toFixed(2)+'%';
+    el.style.width=(Math.max(0,e-s)*100).toFixed(2)+'%';
+  }
+  setSeg('blueBeforeSeg', bhAmStart, ghAmStart);
+  setSeg('goldenMorningSeg', ghAmStart, ghAmEnd);
+  setSeg('daySeg', ghAmEnd, ghPmStart);
+  setSeg('goldenEveningSeg', ghPmStart, ghPmEnd);
+  setSeg('blueAfterSeg', bhPmStart, bhPmEnd);
+
+  const mk=$('timeMarker');
+  if(mk){
+    let pos=(t-baseStart)/span;
+    pos=Math.max(0,Math.min(1,pos));
+    mk.style.left=(pos*100).toFixed(2)+'%';
+  }
+}
+
+/* ========= SEASONS ========= */
+function seasonCacheKey(){
+  const y = now().getFullYear();
+  const lat = currentLocation.lat.toFixed(4);
+  const lng = currentLocation.lng.toFixed(4);
+  return `${y}|${lat}|${lng}|${horizonOffsetMinutes}`;
+}
+
+function loadSeasonCache(key){
+  try{
+    const raw = localStorage.getItem(LS_SEASON_CACHE_KEY);
+    if(!raw) return null;
+    const obj = JSON.parse(raw);
+    if(obj && obj.key===key && obj.data) return obj.data;
+  }catch(_){}
+  return null;
+}
+function saveSeasonCache(key, data){
+  try{
+    localStorage.setItem(LS_SEASON_CACHE_KEY, JSON.stringify({key, data}));
+  }catch(_){}
+}
+
+function recomputeSeasonData(){
+  const t = now();
+  const year = t.getFullYear();
+  const key = seasonCacheKey();
+  const cached = loadSeasonCache(key);
+  if(cached){
+    seasonInfo = cached;
+    return;
+  }
+
+  const start = new Date(year,0,1);
+  const daysInYear = (new Date(year+1,0,1)-start)/86400000;
+
+  let minLen=Infinity, maxLen=-Infinity;
+  let minDate=null, maxDate=null;
+  let todayLen=null;
+
+  for(let i=0;i<daysInYear;i++){
+    const d=new Date(year,0,1+i);
+    const raw=SunCalc.getTimes(d, currentLocation.lat, currentLocation.lng);
+    const adj=applyHorizon(raw);
+    const len=adj.sunset - adj.sunrise;
+    if(len<minLen){minLen=len; minDate=fmtDateNice(d);}
+    if(len>maxLen){maxLen=len; maxDate=fmtDateNice(d);}
+    if(fmtDateNice(d)===fmtDateNice(t)){todayLen=len;}
+  }
+
+  // approximate equinoxes
+  const eq1d = new Date(year,2,20);
+  const eq2d = new Date(year,8,22);
+  const eq1 = applyHorizon(SunCalc.getTimes(eq1d, currentLocation.lat, currentLocation.lng));
+  const eq2 = applyHorizon(SunCalc.getTimes(eq2d, currentLocation.lat, currentLocation.lng));
+  const eqAvg = ((eq1.sunset-eq1.sunrise) + (eq2.sunset-eq2.sunrise))/2;
+
+  seasonInfo = {
+    year,
+    daysInYear,
+    minLen,
+    maxLen,
+    minDate,
+    maxDate,
+    todayLen,
+    eq1: fmtDateNice(eq1d),
+    eq2: fmtDateNice(eq2d),
+    eqAvg
+  };
+  saveSeasonCache(key, seasonInfo);
+}
+
+function updateSeasonsUI(){
+  if(!seasonInfo || !todayTimes) return;
+  const t = now();
+
+  const todayLenMs = (seasonInfo.todayLen!=null) ? seasonInfo.todayLen : (todayTimes.sunset-todayTimes.sunrise);
+
+  $('seasonTodayLen').textContent = msToDayLen(todayLenMs);
+
+  $('seasonDeltaLongest').textContent = `Today has ${formatDelta(todayLenMs - seasonInfo.maxLen)} vs the longest day.`;
+  $('seasonDeltaShortest').textContent = `Today has ${formatDelta(todayLenMs - seasonInfo.minLen)} vs the shortest day.`;
+
+  $('seasonLongestLabel').textContent = `Longest day: ${seasonInfo.maxDate} · ${msToDayLen(seasonInfo.maxLen)}`;
+  $('seasonShortestLabel').textContent = `Shortest day: ${seasonInfo.minDate} · ${msToDayLen(seasonInfo.minLen)}`;
+  $('seasonEquinoxLabel').textContent = `Equinox (approx): ~${msToDayLen(seasonInfo.eqAvg)} around ${seasonInfo.eq1} & ${seasonInfo.eq2}.`;
+
+  const yearStart = new Date(seasonInfo.year,0,1);
+  const dayIndex = Math.floor((t - yearStart)/86400000);
+  const frac = Math.max(0, Math.min(1, dayIndex/(seasonInfo.daysInYear-1)));
+  $('seasonMarker').style.left = (frac*100).toFixed(2)+'%';
+}
+
+/* ========= UI ========= */
+function syncForm(){
+  $('labelInput').value = currentLocation.label || '';
+  $('latInput').value = Math.abs(currentLocation.lat).toFixed(4);
+  $('lngInput').value = Math.abs(currentLocation.lng).toFixed(4);
+  $('latHemi').textContent = currentLocation.lat>=0 ? 'N':'S';
+  $('lngHemi').textContent = currentLocation.lng>=0 ? 'E':'W';
+}
+
+function updateCalibrationStatus(message){
+  const base = `Horizon offset: ${horizonOffsetMinutes>0?'+':''}${horizonOffsetMinutes} min`;
+  $('calibrationStatus').textContent = message ? `${base} · ${message}` : base + (horizonOffsetMinutes===0 ? ' (no terrain adjustment yet)' : ' (calibrated)');
+}
+
+function applyFromForm(){
+  const lat = signedFromInputs($('latInput').value, $('latHemi').textContent.trim());
+  const lng = signedFromInputs($('lngInput').value, $('lngHemi').textContent.trim());
+  const label = $('labelInput').value.trim();
+
+  if(!isFinite(lat) || !isFinite(lng)){
+    $('infoText').textContent = 'Please provide valid latitude and longitude.';
+    return;
+  }
+
+  currentLocation = { lat, lng, label: label || 'My Location' };
+  saveCoords();
+
+  // keep horizon offset, but refresh season cache for new location
+  recomputeSeasonData();
+
+  const t=now();
+  recomputeSunState(t);
+  updateAll(t);
+  $('infoText').textContent = 'Location updated.';
+}
+
+function initGPS(){
+  if(!navigator.geolocation){
+    $('infoText').textContent = 'Geolocation not available in this browser.';
+    return;
+  }
+  $('infoText').textContent = 'Detecting your location…';
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      currentLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude, label: 'My Location' };
+      saveCoords();
+      syncForm();
+      recomputeSeasonData();
+      const t=now();
+      recomputeSunState(t);
+      updateAll(t);
+      $('infoText').textContent = `Detected lat ${currentLocation.lat.toFixed(4)}, lng ${currentLocation.lng.toFixed(4)} (±${Math.round(pos.coords.accuracy)}m).`;
+    },
+    err=>{
+      $('infoText').textContent = 'Geolocation error: ' + err.message;
+    },
+    { enableHighAccuracy:true, timeout:10000, maximumAge:0 }
+  );
+}
+
+function calibrateToRealSunrise(){
+  if(!todayTimes){ updateCalibrationStatus('Sun times not loaded yet.'); return; }
+  const t=now();
+  const diffMinutes = Math.round((t - todayTimes.sunrise)/60000);
+  if(Math.abs(diffMinutes)>20){
+    updateCalibrationStatus('Sunrise calibration works best within ±20 minutes of the real sunrise.');
+    return;
+  }
+  horizonOffsetMinutes = diffMinutes;
+  saveHorizonOffset();
+  // invalidate season cache
+  recomputeSeasonData();
+  recomputeSunState(t);
+  updateAll(t);
+  updateCalibrationStatus('Sunrise calibrated.');
+}
+
+function calibrateToRealSunset(){
+  if(!todayTimes){ updateCalibrationStatus('Sun times not loaded yet.'); return; }
+  const t=now();
+  const diffMinutes = Math.round((t - todayTimes.sunset)/60000);
+  if(Math.abs(diffMinutes)>20){
+    updateCalibrationStatus('Sunset calibration works best within ±20 minutes of the real sunset.');
+    return;
+  }
+  horizonOffsetMinutes = diffMinutes;
+  saveHorizonOffset();
+  recomputeSeasonData();
+  recomputeSunState(t);
+  updateAll(t);
+  updateCalibrationStatus('Sunset calibrated.');
+}
+
+/* ========= MAIN UPDATE LOOP ========= */
+function updateAll(t){
+  $('nowClock').textContent = fmtTime(t);
+  $('nowDate').textContent = fmtDateNice(t);
+  $('tzLabel').textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local time';
+
+  if(!todayTimes){
+    $('sunriseTime').textContent='--:--:--';
+    $('sunsetTime').textContent='--:--:--';
+    $('dayLength').textContent='—';
+    $('dayTrend').textContent='—';
+    $('goldenHours').textContent='—';
+    $('blueHours').textContent='—';
+    $('locLabel').textContent='—';
+    $('nextEventLabel').textContent='—';
+    $('nextEventTime').textContent='--:--:--';
+    $('countdownHms').textContent='00:00:00';
+    $('countdownText').textContent='—';
+    $('nextEventNote').textContent='—';
+    return;
+  }
+
+  // Sun UI
+  $('sunriseTime').textContent = fmtTime(todayTimes.sunrise);
+  $('sunsetTime').textContent  = fmtTime(todayTimes.sunset);
+  $('dayLength').textContent   = msToDayLen(todayTimes.sunset - todayTimes.sunrise);
+
+  if(tomorrowTimes){
+    const todayLen = todayTimes.sunset - todayTimes.sunrise;
+    const tomorrowLen = tomorrowTimes.sunset - tomorrowTimes.sunrise;
+    $('dayTrend').textContent = formatDelta(tomorrowLen - todayLen);
+  }else{
+    $('dayTrend').textContent = '—';
+  }
+
+  const sr=todayTimes.sunrise, ss=todayTimes.sunset;
+  const ghAmStart=sr, ghAmEnd=minutesFrom(sr,60);
+  const ghPmStart=minutesFrom(ss,-60), ghPmEnd=ss;
+  const bhAmStart=minutesFrom(sr,-30), bhAmEnd=sr;
+  const bhPmStart=ss, bhPmEnd=minutesFrom(ss,30);
+
+  $('goldenHours').textContent = `${fmtTimeShort(ghAmStart)}–${fmtTimeShort(ghAmEnd)} · ${fmtTimeShort(ghPmStart)}–${fmtTimeShort(ghPmEnd)}`;
+  $('blueHours').textContent   = `${fmtTimeShort(bhAmStart)}–${fmtTimeShort(bhAmEnd)} · ${fmtTimeShort(bhPmStart)}–${fmtTimeShort(bhPmEnd)}`;
+
+  goldenBlueInfo = { bhAmStart, ghAmStart, ghAmEnd, ghPmStart, ghPmEnd, bhPmStart, bhPmEnd };
+
+  $('locLabel').textContent = currentLocation.label
+    ? currentLocation.label
+    : `${hemi(currentLocation.lat,'N','S')}, ${hemi(currentLocation.lng,'E','W')}`;
+
+  // Next event + countdown
+  if(nextEvent){
+    $('nextEventLabel').textContent = nextEventLabel;
+    $('nextEventTime').textContent  = fmtTime(nextEvent);
+    $('nextEventNote').textContent  = `${nextEventLabel} at ${fmtTime(nextEvent)} on ${fmtDateNice(nextEvent)}.`;
+
+    let diffMs = nextEvent.getTime()-t.getTime();
+    if(diffMs<0) diffMs=0;
+    const totalSeconds=Math.floor(diffMs/1000);
+    const h=Math.floor(totalSeconds/3600);
+    const m=Math.floor((totalSeconds%3600)/60);
+    const s=totalSeconds%60;
+    $('countdownHms').textContent = `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+
+    let txt = 'in ';
+    if(h) txt += `${h}h `;
+    txt += `${m}m`;
+    $('countdownText').textContent = txt.trim();
+  }else{
+    $('nextEventLabel').textContent='—';
+    $('nextEventTime').textContent='--:--:--';
+    $('countdownHms').textContent='00:00:00';
+    $('countdownText').textContent='—';
+    $('nextEventNote').textContent='—';
+  }
+
+  setPhase(t);
+  updateDaylightBar(t);
+  updateSeasonsUI();
+  updateCalibrationStatus();
+}
+
+/* ========= NAV (SUN / SEASONS) ========= */
+function initViews(){
+  const buttons = Array.from(document.querySelectorAll('nav.seg button'));
+  const views = { sun: $('view-sun'), seasons: $('view-seasons') };
+
+  function show(name){
+    buttons.forEach(b=>b.classList.toggle('active', b.dataset.view===name));
+    Object.entries(views).forEach(([k, el])=>el.classList.toggle('active', k===name));
+  }
+
+  buttons.forEach(b=>b.addEventListener('click', ()=>show(b.dataset.view)));
+  $('backToSun').addEventListener('click', (e)=>{e.preventDefault(); show('sun');});
+}
+
+/* ========= INIT ========= */
+document.addEventListener('DOMContentLoaded', ()=>{
+  loadCoords();
+  loadHorizonOffset();
+  syncForm();
+  initViews();
+
+  $('latHemi').addEventListener('click', ()=>{$('latHemi').textContent = $('latHemi').textContent==='N'?'S':'N';});
+  $('lngHemi').addEventListener('click', ()=>{$('lngHemi').textContent = $('lngHemi').textContent==='E'?'W':'E';});
+  $('applyBtn').addEventListener('click', applyFromForm);
+  $('gpsBtn').addEventListener('click', initGPS);
+  $('calibrateSunriseBtn').addEventListener('click', calibrateToRealSunrise);
+  $('calibrateSunsetBtn').addEventListener('click', calibrateToRealSunset);
+
+  recomputeSeasonData();
+  const t=now();
+  recomputeSunState(t);
+  updateAll(t);
+
+  setInterval(()=>{
+    const t=now();
+    recomputeSunState(t);
+    updateAll(t);
+  }, 250);
+});
+</script>
+</body>
+</html>
