@@ -3,8 +3,8 @@
   "short_name": "Sun Clock",
   "description": "A minimalist daylight and seasonal time instrument built around sunrise, sunset, and the arc of the year.",
   "id": "sun-clock",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "/sun-clock/?v=2026-01-14b",
+  "scope": "/sun-clock/",
   "display": "standalone",
   "orientation": "any",
   "dir": "ltr",
@@ -25,3 +25,4 @@
     }
   ]
 }
+
