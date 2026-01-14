@@ -1,70 +1,80 @@
-// Simple cache-first service worker for Sun Clock
+// Sun Clock Service Worker
+// Strategy:
+// - Network-first for navigation/HTML (prevents old versions sticking)
+// - Cache-first for static assets (fast + offline-friendly)
 
-const CACHE_NAME = "sunclock-v1";
+const CACHE_VERSION = "v2026-01-14a"; // <-- bump this anytime you deploy
+const CACHE_NAME = `sunclock-${CACHE_VERSION}`;
 
-const ASSETS_TO_CACHE = [
-  "./",
+const CORE_ASSETS = [
+  "./",               // site root (for GH Pages subpath)
   "./index.html",
-  "./Sun clock.html",
   "./manifest.json",
   "./icons/sunclock-192.png",
-  "./icons/sunclock-512.png"
+  "./icons/sunclock-512.png",
 ];
 
 // Install: cache core assets
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE).catch((err) => {
-        console.warn("[sw] Cache addAll error:", err);
-      });
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS))
   );
   self.skipWaiting();
 });
 
-// Activate: clean up old caches
+// Activate: delete old caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
+        keys
+          .filter((k) => k.startsWith("sunclock-") && k !== CACHE_NAME)
+          .map((k) => caches.delete(k))
       )
     )
   );
   self.clients.claim();
 });
 
-// Fetch: cache-first, then network fallback
 self.addEventListener("fetch", (event) => {
-  const request = event.request;
+  const req = event.request;
 
-  // Only handle GET requests
-  if (request.method !== "GET") return;
+  // Only handle GET
+  if (req.method !== "GET") return;
 
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
-      return fetch(request).then((response) => {
-        // Optionally put a clone in cache
-        const respClone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(request, respClone);
+  const url = new URL(req.url);
+
+  // Network-first for navigations (HTML shell)
+  // This is the most important fix to stop "old build comes back"
+  if (req.mode === "navigate") {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          // Update cached index on successful load
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put("./index.html", copy));
+          return res;
+        })
+        .catch(() =>
+          caches.match("./index.html").then((cached) => cached || caches.match("./"))
+        )
+    );
+    return;
+  }
+
+  // For same-origin static assets: cache-first, then network fallback
+  if (url.origin === location.origin) {
+    event.respondWith(
+      caches.match(req).then((cached) => {
+        if (cached) return cached;
+
+        return fetch(req).then((res) => {
+          // Cache successful responses (basic/opaque are fine for same-origin)
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+          return res;
         });
-        return response;
-      }).catch(() => {
-        // Optional: return a fallback page or nothing
-        return new Response("Offline", {
-          status: 503,
-          statusText: "Offline"
-        });
-      });
-    })
-  );
+      })
+    );
+  }
 });
