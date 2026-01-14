@@ -981,26 +981,33 @@ document.addEventListener('DOMContentLoaded', ()=>{
 });
   <script>
   if ("serviceWorker" in navigator) {
-    window.addEventListener("load", async () => {
-      try {
-        const reg = await navigator.serviceWorker.register('./sw.js?v=2026-01-14b')
+  window.addEventListener("load", async () => {
+    try {
+      const reg = await navigator.serviceWorker.register(
+        "/sun-clock/sw.js?v=2026-01-14b",
+        { scope: "/sun-clock/" }
+      );
 
-        if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        window.location.reload();
+      });
 
-        reg.addEventListener("updatefound", () => {
-          const sw = reg.installing;
-          if (!sw) return;
-          sw.addEventListener("statechange", () => {
-            if (sw.state === "installed" && navigator.serviceWorker.controller) {
-              sw.postMessage({ type: "SKIP_WAITING" });
-            }
-          });
+      if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
+
+      reg.addEventListener("updatefound", () => {
+        const sw = reg.installing;
+        if (!sw) return;
+        sw.addEventListener("statechange", () => {
+          if (sw.state === "installed" && navigator.serviceWorker.controller) {
+            sw.postMessage({ type: "SKIP_WAITING" });
+          }
         });
-      } catch (e) {
-        console.error(e);
-      }
-    });
-  }
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  });
+}
 </script>
 
 </body>
