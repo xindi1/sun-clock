@@ -2,7 +2,7 @@
 // - Network-first for navigations (prevents stale app shell)
 // - Cache-first for assets (offline + speed)
 
-const CACHE_NAME = "sunclock-v2026-01-14b"; // bump on deploy
+const CACHE_NAME = "sunclock-v2026-01-14c"; // bump on deploy
 
 const CORE_ASSETS = [
   "./",
@@ -79,3 +79,4 @@ self.addEventListener("fetch", (event) => {
     })());
   }
 });
+
