@@ -980,13 +980,27 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }, 250);
 });
   <script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('./sw.js')
-      .catch(err => console.error('SW registration failed', err));
-  });
-}
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", async () => {
+      try {
+        const reg = await navigator.serviceWorker.register("./sw.js");
+
+        if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
+
+        reg.addEventListener("updatefound", () => {
+          const sw = reg.installing;
+          if (!sw) return;
+          sw.addEventListener("statechange", () => {
+            if (sw.state === "installed" && navigator.serviceWorker.controller) {
+              sw.postMessage({ type: "SKIP_WAITING" });
+            }
+          });
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    });
+  }
 </script>
 
 </body>
