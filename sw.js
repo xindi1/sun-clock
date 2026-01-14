@@ -1,9 +1,8 @@
 // Sun Clock Service Worker
-// - Network-first for HTML navigations (prevents stale app shell)
+// - Network-first for navigations (prevents stale app shell)
 // - Cache-first for assets (offline + speed)
 
-const CACHE_VERSION = "v2026-01-14a"; // bump this any time you deploy
-const CACHE_NAME = `sunclock-${CACHE_VERSION}`;
+const CACHE_NAME = "sunclock-v2026-01-14b"; // bump on deploy
 
 const CORE_ASSETS = [
   "./",
@@ -11,58 +10,72 @@ const CORE_ASSETS = [
   "./manifest.webmanifest",
   "./sunclock-192.png",
   "./sunclock-512.png",
+  "./sw.js"
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS))
-  );
-  self.skipWaiting();
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.addAll(CORE_ASSETS);
+    self.skipWaiting();
+  })());
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((k) => k.startsWith("sunclock-") && k !== CACHE_NAME)
-          .map((k) => caches.delete(k))
-      )
-    )
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys
+        .filter((k) => k.startsWith("sunclock-") && k !== CACHE_NAME)
+        .map((k) => caches.delete(k))
+    );
+    await self.clients.claim();
+  })());
+});
+
+// Optional but helpful: allow page to force-activate a waiting SW
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
 
-  // Network-first for navigations (index.html)
+  // Network-first for navigations (HTML)
   if (req.mode === "navigate") {
-    event.respondWith(
-      fetch(req)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put("./index.html", copy));
-          return res;
-        })
-        .catch(() => caches.match("./index.html"))
-    );
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(req);
+        const cache = await caches.open(CACHE_NAME);
+
+        // Cache the actual navigation request URL
+        cache.put(req, fresh.clone());
+
+        // Also cache index.html as a fallback shell
+        cache.put(new Request("./index.html", { cache: "reload" }), fresh.clone());
+
+        return fresh;
+      } catch (e) {
+        // Try exact navigation URL first, then index.html
+        const cachedNav = await caches.match(req);
+        return cachedNav || (await caches.match("./index.html"));
+      }
+    })());
     return;
   }
 
   // Cache-first for same-origin assets
   const url = new URL(req.url);
   if (url.origin === location.origin) {
-    event.respondWith(
-      caches.match(req).then((cached) => {
-        if (cached) return cached;
-        return fetch(req).then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
-          return res;
-        });
-      })
-    );
+    event.respondWith((async () => {
+      const cached = await caches.match(req);
+      if (cached) return cached;
+
+      const res = await fetch(req);
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(req, res.clone());
+      return res;
+    })());
   }
 });
