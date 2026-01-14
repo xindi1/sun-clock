@@ -986,7 +986,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", async () => {
       try {
-        const reg = await navigator.serviceWorker.register("./sw.js?v=2026-01-14c");
+       const reg = await navigator.serviceWorker.register("/sun-clock/sw.js?v=2026-01-14c", { scope: "/sun-clock/" });
 
         // Reload once when the new SW takes control
         let refreshed = false;
