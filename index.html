@@ -979,22 +979,30 @@ document.addEventListener('DOMContentLoaded', ()=>{
     updateAll(t);
   }, 250);
 });
-<script>
+  setInterval(()=>{
+    const t=now();
+    recomputeSunState(t);
+    updateAll(t);
+  }, 250);
+});
+</script>
 
 <script>
-  // GitHub Pages repo site: https://xindi1.github.io/sun-clock/
-  // From that page, "./sw.js" correctly resolves to "/sun-clock/sw.js"
+  // Service Worker registration (GitHub Pages project site)
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", async () => {
       try {
-        const reg = await navigator.serviceWorker.register("./sw.js?v=2026-01-14b");
+        const reg = await navigator.serviceWorker.register("./sw.js?v=2026-01-14c");
 
-        // When the new SW takes control, reload once to get fresh assets
+        // Reload once when the new SW takes control
+        let refreshed = false;
         navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (refreshed) return;
+          refreshed = true;
           window.location.reload();
         });
 
-        // If there's a waiting SW, tell it to activate immediately
+        // Activate updates immediately
         if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
 
         reg.addEventListener("updatefound", () => {
