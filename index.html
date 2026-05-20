@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Sun Clock</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#07111f">
+  <meta name="description" content="An ambient solar time instrument built around sunrise, sunset, daylight, and the arc of the year." />
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="sunclock-192.png">
+  <style>
+    :root{
+      --bg:#07111f;
+      --bg-2:#0b1627;
+      --panel:rgba(12,18,32,.74);
+      --panel-strong:rgba(10,15,26,.92);
+      --card:rgba(17,24,39,.68);
+      --card-soft:rgba(255,255,255,.045);
+      --text:#eef4ff;
+      --muted:#94a3b8;
+      --faint:#64748b;
+      --line:rgba(255,255,255,.075);
+      --line-soft:rgba(255,255,255,.045);
+      --solar:#f7c948;
+      --solar-2:#f59e0b;
+      --sky:#7dd3fc;
+      --blue:#60a5fa;
+      --danger:#fb7185;
+      --ok:#34d399;
+      --shadow:0 24px 80px rgba(0,0,0,.36);
+      --radius:28px;
+      --radius-sm:18px;
+
+      --g-night:
+        radial-gradient(circle at 50% -16%, rgba(96,165,250,.12), transparent 40%),
+        radial-gradient(circle at 20% 0%, rgba(15,23,42,.95), transparent 38%),
+        linear-gradient(180deg,#030712 0%,#07111f 48%,#020617 100%);
+      --g-dawn:
+        radial-gradient(circle at 50% -12%, rgba(247,201,72,.24), transparent 38%),
+        radial-gradient(circle at 12% 8%, rgba(125,211,252,.16), transparent 32%),
+        linear-gradient(180deg,#0f2437 0%,#07111f 56%,#020617 100%);
+      --g-day:
+        radial-gradient(circle at 50% -10%, rgba(125,211,252,.28), transparent 42%),
+        radial-gradient(circle at 84% 0%, rgba(247,201,72,.16), transparent 36%),
+        linear-gradient(180deg,#123354 0%,#07111f 58%,#020617 100%);
+      --g-dusk:
+        radial-gradient(circle at 50% -10%, rgba(245,158,11,.25), transparent 40%),
+        radial-gradient(circle at 0% 0%, rgba(251,113,133,.13), transparent 36%),
+        linear-gradient(180deg,#301b2d 0%,#07111f 58%,#020617 100%);
+    }
+
+    html[data-theme="light"]{
+      --bg:#eef5ff;
+      --bg-2:#f8fbff;
+      --panel:rgba(255,255,255,.72);
+      --panel-strong:rgba(255,255,255,.92);
+      --card:rgba(255,255,255,.68);
+      --card-soft:rgba(15,23,42,.035);
+      --text:#0f172a;
+      --muted:#64748b;
+      --faint:#94a3b8;
+      --line:rgba(15,23,42,.09);
+      --line-soft:rgba(15,23,42,.055);
+      --shadow:0 24px 80px rgba(15,23,42,.14);
+      --g-night:linear-gradient(180deg,#111827 0%,#0f172a 100%);
+      --g-dawn:radial-gradient(circle at 50% -10%, rgba(247,201,72,.26), transparent 40%),linear-gradient(180deg,#dbeafe 0%,#f8fbff 100%);
+      --g-day:radial-gradient(circle at 50% -8%, rgba(125,211,252,.34), transparent 42%),linear-gradient(180deg,#dff5ff 0%,#f8fbff 100%);
+      --g-dusk:radial-gradient(circle at 50% -8%, rgba(251,146,60,.28), transparent 40%),linear-gradient(180deg,#ffedd5 0%,#f8fbff 100%);
+    }
+
+    *{box-sizing:border-box}
+    html{min-height:100%;background:var(--bg)}
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color:var(--text);
+      background:var(--g-dawn);
+      padding: max(16px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom));
+      transition:background .9s ease,color .3s ease;
+    }
+    body.phase-night{background:var(--g-night)}
+    body.phase-dawn{background:var(--g-dawn)}
+    body.phase-day{background:var(--g-day)}
+    body.phase-dusk{background:var(--g-dusk)}
+
+    button,input{font:inherit}
+    button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+    .shell{max-width:1060px;margin:0 auto}
+    .frame{
+      position:relative;
+      overflow:hidden;
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.022)),var(--panel);
+      box-shadow:var(--shadow);
+      padding:22px;
+      backdrop-filter:blur(22px);
+      -webkit-backdrop-filter:blur(22px);
+    }
+    .frame:before{
+      content:"";
+      position:absolute;
+      inset:-120px -80px auto;
+      height:280px;
+      background:radial-gradient(circle at 50% 45%, rgba(247,201,72,.12), transparent 58%);
+      pointer-events:none;
+    }
+
+    header{position:relative;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px}
+    .brand-kicker{font-size:.74rem;color:var(--muted);letter-spacing:.18em;text-transform:uppercase;margin-bottom:6px}
+    h1{margin:0;font-size:clamp(1.65rem,5vw,3.2rem);line-height:.96;letter-spacing:-.06em;font-weight:860}
+    .sub{max-width:560px;margin-top:10px;color:var(--muted);font-size:.94rem;line-height:1.45}
+    .top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+
+    .chip,.icon-btn,.seg button,.sheet button{
+      border:1px solid var(--line);
+      color:var(--text);
+      background:rgba(255,255,255,.045);
+      border-radius:999px;
+      min-height:36px;
+      padding:8px 12px;
+    }
+    .icon-btn{width:38px;padding:0;display:grid;place-items:center}
+    .chip{display:inline-flex;align-items:center;gap:8px;font-size:.8rem;color:var(--muted)}
+    .dot{width:7px;height:7px;border-radius:999px;background:var(--solar);box-shadow:0 0 18px rgba(247,201,72,.88)}
+
+    .hero{
+      position:relative;
+      display:grid;
+      grid-template-columns:minmax(0,1.15fr) minmax(300px,.85fr);
+      gap:18px;
+      align-items:stretch;
+    }
+    @media(max-width:860px){.hero{grid-template-columns:1fr}.frame{padding:18px;border-radius:24px}header{flex-direction:column}.top-actions{justify-content:flex-start}}
+
+    .solar-stage{
+      position:relative;
+      min-height:390px;
+      border-radius:26px;
+      overflow:hidden;
+      background:
+        radial-gradient(circle at 50% 8%, rgba(247,201,72,.12), transparent 22%),
+        linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.018));
+      border:1px solid var(--line-soft);
+    }
+    .solar-stage:before{
+      content:"";
+      position:absolute;
+      inset:22px 24px;
+      border-radius:999px 999px 28px 28px;
+      border-top:1px solid rgba(255,255,255,.12);
+      opacity:.7;
+      mask-image:linear-gradient(90deg,transparent,black 18%,black 82%,transparent);
+    }
+    .sun-orb{
+      position:absolute;
+      left:50%;
+      top:32%;
+      width:146px;
+      aspect-ratio:1;
+      transform:translate(-50%,-50%);
+      border-radius:50%;
+      background:radial-gradient(circle at 36% 30%, #fff3a3 0%, #f7c948 38%, #f59e0b 72%, rgba(245,158,11,.08) 100%);
+      box-shadow:0 0 36px rgba(247,201,72,.62),0 0 120px rgba(247,201,72,.28),0 0 220px rgba(96,165,250,.08);
+      transition:top .9s ease,opacity .6s ease,transform .6s ease;
+    }
+    .sun-orb:after{
+      content:"";
+      position:absolute;
+      inset:-22px;
+      border-radius:50%;
+      background:radial-gradient(circle,rgba(247,201,72,.18),transparent 66%);
+      filter:blur(4px);
+    }
+    body.phase-night .sun-orb{opacity:.18;top:82%;transform:translate(-50%,-50%) scale(.78)}
+    body.phase-dawn .sun-orb{top:60%}
+    body.phase-day .sun-orb{top:31%}
+    body.phase-dusk .sun-orb{top:64%}
+
+    .hero-readout{position:absolute;left:24px;right:24px;bottom:22px;display:grid;gap:16px}
+    .phase-pill{width:max-content;display:inline-flex;gap:8px;align-items:center;padding:7px 10px;border:1px solid var(--line);border-radius:999px;color:var(--muted);background:rgba(2,6,23,.24);font-size:.78rem}
+    .time{font-size:clamp(3.2rem,12vw,6.4rem);font-weight:880;letter-spacing:-.08em;line-height:.85;font-variant-numeric:tabular-nums}
+    .date-line{display:flex;flex-wrap:wrap;gap:9px;color:var(--muted);font-size:.88rem}
+    .date-line span{padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.045);border:1px solid var(--line-soft)}
+
+    .side-stack{display:grid;gap:14px}
+    .primary-card,.card,.sheet{
+      background:linear-gradient(180deg,rgba(255,255,255,.052),rgba(255,255,255,.025)),var(--card);
+      border:1px solid var(--line-soft);
+      border-radius:24px;
+      padding:18px;
+      backdrop-filter:blur(18px);
+      -webkit-backdrop-filter:blur(18px);
+    }
+    .label{font-size:.76rem;color:var(--muted);letter-spacing:.04em;margin-bottom:8px}
+    .primary-row{display:flex;align-items:flex-end;justify-content:space-between;gap:14px}
+    .event{font-size:1.32rem;font-weight:760;letter-spacing:-.03em}
+    .event-time{font-size:2rem;font-weight:860;letter-spacing:-.055em;font-variant-numeric:tabular-nums}
+    .countdown{margin-top:8px;font-size:2.15rem;font-weight:850;letter-spacing:-.045em;font-variant-numeric:tabular-nums}
+    .muted{color:var(--muted)}
+
+    .timeline{position:relative;height:16px;margin:17px 0 8px;border-radius:999px;overflow:hidden;background:rgba(148,163,184,.18);border:1px solid var(--line-soft)}
+    .segm{position:absolute;top:0;height:100%;filter:saturate(.95)}
+    .seg-blue{background:linear-gradient(90deg,rgba(96,165,250,.22),rgba(125,211,252,.36))}
+    .seg-golden{background:linear-gradient(90deg,rgba(245,158,11,.58),rgba(247,201,72,.78))}
+    .seg-day{background:linear-gradient(90deg,rgba(255,255,255,.10),rgba(125,211,252,.24),rgba(255,255,255,.10))}
+    .marker{position:absolute;top:-5px;bottom:-5px;width:3px;border-radius:999px;background:var(--text);box-shadow:0 0 0 4px rgba(255,255,255,.08),0 0 24px rgba(247,201,72,.45)}
+
+    .mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .mini{padding:14px;border-radius:20px;background:var(--card-soft);border:1px solid var(--line-soft)}
+    .mini-value{font-size:1.45rem;font-weight:790;letter-spacing:-.045em;font-variant-numeric:tabular-nums}
+    .rows{display:grid;gap:10px;margin-top:4px}
+    .row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding-top:10px;border-top:1px solid var(--line-soft)}
+    .row:first-child{border-top:0;padding-top:0}
+    .row b{font-weight:650;color:var(--text)}
+    .mono{font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .seg{display:flex;gap:6px;padding:4px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.04);margin:18px 0 0;width:max-content;max-width:100%}
+    .seg button{min-height:34px;border-color:transparent;background:transparent;color:var(--muted);padding:7px 14px;font-size:.86rem}
+    .seg button.active{background:rgba(247,201,72,.16);color:var(--text);border-color:rgba(247,201,72,.23);box-shadow:inset 0 0 18px rgba(247,201,72,.05)}
+
+    .view{display:none;margin-top:16px}.view.active{display:block}
+    .season-bar{position:relative;height:18px;border-radius:999px;background:linear-gradient(90deg,#0f172a,#60a5fa,#22c55e,#f7c948,#fb923c,#7f1d1d);overflow:hidden;border:1px solid var(--line-soft);margin:18px 0 12px}
+    .season-marker{position:absolute;top:-5px;bottom:-5px;width:3px;border-radius:999px;background:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.12)}
+
+    .drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.38);opacity:0;pointer-events:none;transition:.25s ease;z-index:20}
+    .drawer-backdrop.open{opacity:1;pointer-events:auto}
+    .drawer{position:fixed;left:50%;bottom:12px;z-index:30;width:min(720px,calc(100% - 24px));transform:translate(-50%,calc(100% + 20px));transition:transform .32s ease}
+    .drawer.open{transform:translate(-50%,0)}
+    .sheet{background:var(--panel-strong);box-shadow:var(--shadow)}
+    .sheet-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:14px}
+    .sheet h2{font-size:1.1rem;margin:0;letter-spacing:-.03em}
+    .settings-grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px}
+    @media(max-width:640px){.settings-grid{grid-template-columns:1fr}.mini-grid{grid-template-columns:1fr}.solar-stage{min-height:360px}.sun-orb{width:128px}}
+    .field label{display:block;color:var(--muted);font-size:.78rem;margin:0 0 6px}
+    input{width:100%;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.045);color:var(--text);padding:11px 12px;outline:none}
+    input:focus{border-color:rgba(247,201,72,.4);box-shadow:0 0 0 4px rgba(247,201,72,.08)}
+    .coord{display:flex;gap:7px}.coord input{flex:1}.badge{width:48px;padding:0;text-align:center}
+    .actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}.btn-primary{background:linear-gradient(180deg,#f7c948,#f59e0b);border-color:transparent;color:#111827;font-weight:730}.btn-secondary{background:rgba(255,255,255,.045)}
+    .help{font-size:.78rem;color:var(--muted);line-height:1.4;margin-top:10px}
+    footer{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;color:var(--faint);font-size:.78rem;margin-top:16px;padding:0 4px}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="frame">
+      <header>
+        <div>
+          <div class="brand-kicker">Ambient solar instrument</div>
+          <h1>Sun Clock</h1>
+          <div class="sub">A quiet view of daylight, next solar event, golden hour, and the seasonal arc at your location.</div>
+        </div>
+        <div class="top-actions">
+          <div class="chip"><span class="dot"></span><span id="phaseLabel">Solar phase</span></div>
+          <button class="icon-btn" id="themeBtn" type="button" aria-label="Toggle theme">◐</button>
+          <button class="chip" id="settingsBtn" type="button">Configure</button>
+        </div>
+      </header>
+
+      <section class="hero">
+        <div class="solar-stage">
+          <div class="sun-orb" aria-hidden="true"></div>
+          <div class="hero-readout">
+            <div class="phase-pill"><span class="dot"></span><span id="phasePill">Dawn</span></div>
+            <div class="time mono" id="nowClock">--:--:--</div>
+            <div class="date-line">
+              <span id="nowDate">—</span>
+              <span id="tzLabel">—</span>
+              <span id="locLabel">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="side-stack">
+          <div class="primary-card">
+            <div class="label">Next solar event</div>
+            <div class="primary-row">
+              <div>
+                <div class="event" id="nextEventLabel">—</div>
+                <div class="muted" id="countdownText">—</div>
+              </div>
+              <div class="event-time mono" id="nextEventTime">--:--</div>
+            </div>
+            <div class="countdown mono" id="countdownHms">00:00:00</div>
+            <div class="timeline" aria-label="Daylight timeline">
+              <div class="segm seg-blue" id="blueBeforeSeg"></div>
+              <div class="segm seg-golden" id="goldenMorningSeg"></div>
+              <div class="segm seg-day" id="daySeg"></div>
+              <div class="segm seg-golden" id="goldenEveningSeg"></div>
+              <div class="segm seg-blue" id="blueAfterSeg"></div>
+              <div class="marker" id="timeMarker"></div>
+            </div>
+            <div class="help" id="nextEventNote">—</div>
+          </div>
+
+          <div class="mini-grid">
+            <div class="mini">
+              <div class="label">Sunrise</div>
+              <div class="mini-value mono" id="sunriseTime">--:--</div>
+            </div>
+            <div class="mini">
+              <div class="label">Sunset</div>
+              <div class="mini-value mono" id="sunsetTime">--:--</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="rows">
+              <div class="row"><span class="muted">Day length</span><b class="mono" id="dayLength">—</b></div>
+              <div class="row"><span class="muted">Tomorrow</span><b class="mono" id="dayTrend">—</b></div>
+              <div class="row"><span class="muted">Golden hour</span><b class="mono" id="goldenHours">—</b></div>
+              <div class="row"><span class="muted">Blue hour</span><b class="mono" id="blueHours">—</b></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <nav class="seg" aria-label="Views">
+        <button type="button" class="active" data-view="sun">Today</button>
+        <button type="button" data-view="seasons">Season arc</button>
+      </nav>
+
+      <section class="view active" id="view-sun"></section>
+
+      <section class="view" id="view-seasons">
+        <div class="card">
+          <div class="label">Seasonal daylight</div>
+          <div class="muted">Year view of daylight at your chosen coordinates, including any horizon calibration.</div>
+          <div class="season-bar" aria-label="Year progress"><div class="season-marker" id="seasonMarker"></div></div>
+          <div class="rows">
+            <div class="row"><span class="muted">Today’s day length</span><b class="mono" id="seasonTodayLen">—</b></div>
+            <div class="row"><span class="muted">vs longest day</span><b class="mono" id="seasonDeltaLongest">—</b></div>
+            <div class="row"><span class="muted">vs shortest day</span><b class="mono" id="seasonDeltaShortest">—</b></div>
+            <div class="row"><span class="muted">Longest day</span><b class="mono" id="seasonLongestLabel">—</b></div>
+            <div class="row"><span class="muted">Shortest day</span><b class="mono" id="seasonShortestLabel">—</b></div>
+          </div>
+          <div class="help" id="seasonEquinoxLabel">—</div>
+        </div>
+      </section>
+
+      <footer>
+        <span>Sun Clock · modern rebuild</span>
+        <span>Sunrise · Sunset · Countdown · Seasons</span>
+      </footer>
+    </section>
+  </main>
+
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="sheet">
+      <div class="sheet-head">
+        <div>
+          <h2>Configure Sun Clock</h2>
+          <div class="help" style="margin-top:4px">Set location and calibrate horizon offset.</div>
+        </div>
+        <button class="icon-btn" id="closeDrawer" type="button" aria-label="Close settings">×</button>
+      </div>
+
+      <div class="settings-grid">
+        <div class="field">
+          <label for="labelInput">Location label</label>
+          <input id="labelInput" placeholder="e.g., Charlotte, NC" />
+        </div>
+        <div class="field">
+          <label for="latInput">Latitude</label>
+          <div class="coord"><input id="latInput" type="number" step="0.0001" placeholder="35.2106" /><button id="latHemi" type="button" class="badge">N</button></div>
+        </div>
+        <div class="field">
+          <label for="lngInput">Longitude</label>
+          <div class="coord"><input id="lngInput" type="number" step="0.0001" placeholder="80.8021" /><button id="lngHemi" type="button" class="badge">W</button></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="applyBtn" type="button" class="btn-primary">Apply location</button>
+        <button id="gpsBtn" type="button" class="btn-secondary">Use my location</button>
+        <button id="calibrateSunriseBtn" type="button" class="btn-secondary">Calibrate sunrise</button>
+        <button id="calibrateSunsetBtn" type="button" class="btn-secondary">Calibrate sunset</button>
+      </div>
+      <div class="help" id="calibrationStatus"></div>
+      <div class="help" id="infoText">Tip: enter absolute values, then set hemisphere. Calibration is best within ±20 minutes of the real event.</div>
+    </div>
+  </aside>
+
+<script>
+/* ========= THEME ========= */
+(function initTheme(){
+  const key='sunclock_theme_modern';
+  const saved = localStorage.getItem(key) || 'blue';
+  document.documentElement.dataset.theme = saved === 'light' ? 'light' : 'blue';
+  document.getElementById('themeBtn').addEventListener('click',()=>{
+    const next = document.documentElement.dataset.theme === 'light' ? 'blue' : 'light';
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem(key,next);
+  });
+})();
+
+/* ========= SUNCALC ========= */
+const SunCalc = (function(){
+  const PI=Math.PI, rad=PI/180;
+  function toJulian(date){return date.valueOf()/86400000-0.5+2440588}
+  function fromJulian(j){return new Date((j+0.5-2440588)*86400000)}
+  function toDays(date){return toJulian(date)-2451545}
+  function solarMeanAnomaly(d){return rad*(357.5291+0.98560028*d)}
+  function eclipticLongitude(M){const C=rad*(1.9148*Math.sin(M)+0.02*Math.sin(2*M)+0.0003*Math.sin(3*M));const P=rad*102.9372;return M+C+P+PI;}
+  const e=rad*23.4397;
+  function declination(L,b=0){return Math.asin(Math.sin(b)*Math.cos(e)+Math.cos(b)*Math.sin(e)*Math.sin(L));}
+  function julianCycle(d,lw){return Math.round(d-0.0009-lw/(2*PI))}
+  function approxTransit(Ht,lw,n){return 0.0009+(Ht+lw)/(2*PI)+n}
+  function solarTransitJ(ds,M,L){return 2451545+ds+0.0053*Math.sin(M)-0.0069*Math.sin(2*L)}
+  function getTimes(date,lat,lng){
+    const lw=-lng*rad, phi=lat*rad, d=toDays(date), n=julianCycle(d,lw), ds=approxTransit(0,lw,n), M=solarMeanAnomaly(ds), L=eclipticLongitude(M), dec=declination(L), Jnoon=solarTransitJ(ds,M,L), h0=-0.833*rad;
+    const x=(Math.sin(h0)-Math.sin(phi)*Math.sin(dec))/(Math.cos(phi)*Math.cos(dec));
+    const w=Math.acos(Math.max(-1,Math.min(1,x)));
+    const a=approxTransit(w,lw,n), Jset=solarTransitJ(a,M,L), Jrise=Jnoon-(Jset-Jnoon);
+    return { sunrise:fromJulian(Jrise), sunset:fromJulian(Jset), solarNoon:fromJulian(Jnoon) };
+  }
+  return { getTimes };
+})();
+
+const LS_COORDS_KEY='sunclock_coords_modern';
+const LS_HORIZON_KEY='sunclock_horizon_offset_modern';
+const LS_SEASON_CACHE_KEY='sunclock_season_cache_modern_v1';
+const $=(id)=>document.getElementById(id);
+let currentLocation={lat:35.2106,lng:-80.8021,label:'Charlotte, NC'};
+let horizonOffsetMinutes=0;
+let todayTimes=null,tomorrowTimes=null,nextEvent=null,nextEventLabel='',goldenBlueInfo=null,phaseClass='',seasonInfo=null;
+
+function loadCoords(){try{const raw=localStorage.getItem(LS_COORDS_KEY);if(!raw)return;const obj=JSON.parse(raw);if(typeof obj.lat==='number'&&typeof obj.lng==='number')currentLocation={lat:obj.lat,lng:obj.lng,label:obj.label||'My Location'};}catch(_){}}
+function saveCoords(){localStorage.setItem(LS_COORDS_KEY,JSON.stringify(currentLocation));}
+function loadHorizonOffset(){try{const raw=localStorage.getItem(LS_HORIZON_KEY);if(raw!==null){const val=parseInt(raw,10);if(!isNaN(val))horizonOffsetMinutes=val;}}catch(_){}}
+function saveHorizonOffset(){localStorage.setItem(LS_HORIZON_KEY,String(horizonOffsetMinutes));}
+function pad2(n){return String(n).padStart(2,'0')}
+function now(){return new Date()}
+function fmtTime(d){return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`}
+function fmtTimeShort(d){return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`}
+function fmtDateNice(d){return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`}
+function minutesFrom(d,mins){return new Date(d.getTime()+mins*60000)}
+function msToDayLen(ms){const h=Math.floor(ms/3600000);const m=Math.round((ms%3600000)/60000);return `${h}h ${m}m`}
+function formatDelta(ms){const sign=ms>=0?'+':'−';const abs=Math.abs(ms);const m=Math.floor(abs/60000);const s=Math.round((abs%60000)/1000);if(m===0&&s===0)return 'same';return `${sign}${m}m ${s}s`;}
+function signedFromInputs(v,hemiChar){const n=Math.abs(parseFloat(v)||0);return (hemiChar==='S'||hemiChar==='W')?-n:n;}
+function applyHorizon(times){const off=horizonOffsetMinutes*60000;return {sunrise:new Date(times.sunrise.getTime()+off),sunset:new Date(times.sunset.getTime()+off),solarNoon:times.solarNoon};}
+
+function recomputeSunState(t){
+  const events=[];todayTimes=null;tomorrowTimes=null;
+  for(let off=-1;off<=2;off++){
+    const base=new Date(t.getFullYear(),t.getMonth(),t.getDate()+off);
+    const adj=applyHorizon(SunCalc.getTimes(base,currentLocation.lat,currentLocation.lng));
+    if(off===0)todayTimes=adj;if(off===1)tomorrowTimes=adj;
+    events.push({label:'Sunrise',time:adj.sunrise},{label:'Sunset',time:adj.sunset});
+  }
+  const future=events.filter(e=>e.time.getTime()>t.getTime()+500).sort((a,b)=>a.time-b.time);
+  nextEvent=future[0]?.time||null;nextEventLabel=future[0]?.label||'';
+}
+function determinePhase(t){
+  if(!todayTimes)return 'day';const sr=todayTimes.sunrise,ss=todayTimes.sunset;
+  const dawnStart=minutesFrom(sr,-30),dawnEnd=minutesFrom(sr,45),duskStart=minutesFrom(ss,-60),duskEnd=minutesFrom(ss,30);
+  if(t>=dawnStart&&t<dawnEnd)return 'dawn';if(t>=dawnEnd&&t<duskStart)return 'day';if(t>=duskStart&&t<duskEnd)return 'dusk';return 'night';
+}
+function setPhase(t){
+  const phase=determinePhase(t), cls='phase-'+phase;
+  if(cls!==phaseClass){if(phaseClass)document.body.classList.remove(phaseClass);document.body.classList.add(cls);phaseClass=cls;}
+  const nice=phase.charAt(0).toUpperCase()+phase.slice(1);
+  $('phaseLabel').textContent=nice;$('phasePill').textContent=nice;
+}
+function updateDaylightBar(t){
+  const ids=['blueBeforeSeg','goldenMorningSeg','daySeg','goldenEveningSeg','blueAfterSeg'];
+  if(!goldenBlueInfo){ids.forEach(id=>{const el=$(id);if(el){el.style.left='0%';el.style.width='0%';}});return;}
+  const {bhAmStart,ghAmStart,ghAmEnd,ghPmStart,ghPmEnd,bhPmStart,bhPmEnd}=goldenBlueInfo;
+  const baseStart=bhAmStart,baseEnd=bhPmEnd,span=baseEnd-baseStart;if(span<=0)return;
+  function setSeg(id,start,end){const el=$(id);if(!el)return;const s=Math.max(0,Math.min(1,(start-baseStart)/span));const e=Math.max(0,Math.min(1,(end-baseStart)/span));el.style.left=(s*100).toFixed(2)+'%';el.style.width=(Math.max(0,e-s)*100).toFixed(2)+'%';}
+  setSeg('blueBeforeSeg',bhAmStart,ghAmStart);setSeg('goldenMorningSeg',ghAmStart,ghAmEnd);setSeg('daySeg',ghAmEnd,ghPmStart);setSeg('goldenEveningSeg',ghPmStart,ghPmEnd);setSeg('blueAfterSeg',bhPmStart,bhPmEnd);
+  const mk=$('timeMarker');if(mk){let pos=(t-baseStart)/span;pos=Math.max(0,Math.min(1,pos));mk.style.left=(pos*100).toFixed(2)+'%';}
+}
+
+function seasonCacheKey(){const y=now().getFullYear();return `${y}|${currentLocation.lat.toFixed(4)}|${currentLocation.lng.toFixed(4)}|${horizonOffsetMinutes}`;}
+function loadSeasonCache(key){try{const raw=localStorage.getItem(LS_SEASON_CACHE_KEY);if(!raw)return null;const obj=JSON.parse(raw);if(obj&&obj.key===key&&obj.data)return obj.data;}catch(_){}return null;}
+function saveSeasonCache(key,data){try{localStorage.setItem(LS_SEASON_CACHE_KEY,JSON.stringify({key,data}));}catch(_){}}
+function recomputeSeasonData(){
+  const t=now(),year=t.getFullYear(),key=seasonCacheKey(),cached=loadSeasonCache(key);if(cached){seasonInfo=cached;return;}
+  const daysInYear=(new Date(year+1,0,1)-new Date(year,0,1))/86400000;let minLen=Infinity,maxLen=-Infinity,minDate=null,maxDate=null,todayLen=null;
+  for(let i=0;i<daysInYear;i++){const d=new Date(year,0,1+i);const adj=applyHorizon(SunCalc.getTimes(d,currentLocation.lat,currentLocation.lng));const len=adj.sunset-adj.sunrise;if(len<minLen){minLen=len;minDate=fmtDateNice(d);}if(len>maxLen){maxLen=len;maxDate=fmtDateNice(d);}if(fmtDateNice(d)===fmtDateNice(t))todayLen=len;}
+  const eq1d=new Date(year,2,20),eq2d=new Date(year,8,22),eq1=applyHorizon(SunCalc.getTimes(eq1d,currentLocation.lat,currentLocation.lng)),eq2=applyHorizon(SunCalc.getTimes(eq2d,currentLocation.lat,currentLocation.lng));
+  seasonInfo={year,daysInYear,minLen,maxLen,minDate,maxDate,todayLen,eq1:fmtDateNice(eq1d),eq2:fmtDateNice(eq2d),eqAvg:((eq1.sunset-eq1.sunrise)+(eq2.sunset-eq2.sunrise))/2};saveSeasonCache(key,seasonInfo);
+}
+function updateSeasonsUI(){
+  if(!seasonInfo||!todayTimes)return;const t=now(),todayLenMs=seasonInfo.todayLen??(todayTimes.sunset-todayTimes.sunrise);
+  $('seasonTodayLen').textContent=msToDayLen(todayLenMs);$('seasonDeltaLongest').textContent=formatDelta(todayLenMs-seasonInfo.maxLen);$('seasonDeltaShortest').textContent=formatDelta(todayLenMs-seasonInfo.minLen);
+  $('seasonLongestLabel').textContent=`${seasonInfo.maxDate} · ${msToDayLen(seasonInfo.maxLen)}`;$('seasonShortestLabel').textContent=`${seasonInfo.minDate} · ${msToDayLen(seasonInfo.minLen)}`;$('seasonEquinoxLabel').textContent=`Approx. equinox daylight: ~${msToDayLen(seasonInfo.eqAvg)} around ${seasonInfo.eq1} and ${seasonInfo.eq2}.`;
+  const dayIndex=Math.floor((t-new Date(seasonInfo.year,0,1))/86400000),frac=Math.max(0,Math.min(1,dayIndex/(seasonInfo.daysInYear-1)));$('seasonMarker').style.left=(frac*100).toFixed(2)+'%';
+}
+
+function syncForm(){
+  $('labelInput').value=currentLocation.label||'';$('latInput').value=Math.abs(currentLocation.lat).toFixed(4);$('lngInput').value=Math.abs(currentLocation.lng).toFixed(4);$('latHemi').textContent=currentLocation.lat>=0?'N':'S';$('lngHemi').textContent=currentLocation.lng>=0?'E':'W';
+}
+function updateCalibrationStatus(message){const base=`Horizon offset: ${horizonOffsetMinutes>0?'+':''}${horizonOffsetMinutes} min`;$('calibrationStatus').textContent=message?`${base} · ${message}`:base+(horizonOffsetMinutes===0?' · no terrain adjustment':' · calibrated');}
+function applyFromForm(){
+  const lat=signedFromInputs($('latInput').value,$('latHemi').textContent.trim()),lng=signedFromInputs($('lngInput').value,$('lngHemi').textContent.trim()),label=$('labelInput').value.trim();
+  if(!isFinite(lat)||!isFinite(lng)){$('infoText').textContent='Please provide valid latitude and longitude.';return;}
+  currentLocation={lat,lng,label:label||'My Location'};saveCoords();recomputeSeasonData();const t=now();recomputeSunState(t);updateAll(t);$('infoText').textContent='Location updated.';closeDrawer();
+}
+function initGPS(){
+  if(!navigator.geolocation){$('infoText').textContent='Geolocation not available in this browser.';return;}
+  $('infoText').textContent='Detecting your location…';
+  navigator.geolocation.getCurrentPosition(pos=>{currentLocation={lat:pos.coords.latitude,lng:pos.coords.longitude,label:'My Location'};saveCoords();syncForm();recomputeSeasonData();const t=now();recomputeSunState(t);updateAll(t);$('infoText').textContent=`Detected lat ${currentLocation.lat.toFixed(4)}, lng ${currentLocation.lng.toFixed(4)}.`;},err=>{$('infoText').textContent='Geolocation error: '+err.message;},{enableHighAccuracy:true,timeout:10000,maximumAge:0});
+}
+function calibrateToRealSunrise(){if(!todayTimes)return;const t=now(),diffMinutes=Math.round((t-todayTimes.sunrise)/60000);if(Math.abs(diffMinutes)>20){updateCalibrationStatus('Sunrise calibration works best within ±20 minutes.');return;}horizonOffsetMinutes=diffMinutes;saveHorizonOffset();recomputeSeasonData();recomputeSunState(t);updateAll(t);updateCalibrationStatus('Sunrise calibrated.');}
+function calibrateToRealSunset(){if(!todayTimes)return;const t=now(),diffMinutes=Math.round((t-todayTimes.sunset)/60000);if(Math.abs(diffMinutes)>20){updateCalibrationStatus('Sunset calibration works best within ±20 minutes.');return;}horizonOffsetMinutes=diffMinutes;saveHorizonOffset();recomputeSeasonData();recomputeSunState(t);updateAll(t);updateCalibrationStatus('Sunset calibrated.');}
+
+function updateAll(t){
+  $('nowClock').textContent=fmtTime(t);$('nowDate').textContent=fmtDateNice(t);$('tzLabel').textContent=Intl.DateTimeFormat().resolvedOptions().timeZone||'Local time';$('locLabel').textContent=currentLocation.label||`${currentLocation.lat.toFixed(4)}, ${currentLocation.lng.toFixed(4)}`;
+  if(!todayTimes)return;
+  $('sunriseTime').textContent=fmtTimeShort(todayTimes.sunrise);$('sunsetTime').textContent=fmtTimeShort(todayTimes.sunset);$('dayLength').textContent=msToDayLen(todayTimes.sunset-todayTimes.sunrise);
+  if(tomorrowTimes){$('dayTrend').textContent=formatDelta((tomorrowTimes.sunset-tomorrowTimes.sunrise)-(todayTimes.sunset-todayTimes.sunrise));}
+  const sr=todayTimes.sunrise,ss=todayTimes.sunset,ghAmStart=sr,ghAmEnd=minutesFrom(sr,60),ghPmStart=minutesFrom(ss,-60),ghPmEnd=ss,bhAmStart=minutesFrom(sr,-30),bhAmEnd=sr,bhPmStart=ss,bhPmEnd=minutesFrom(ss,30);
+  $('goldenHours').textContent=`${fmtTimeShort(ghAmStart)}–${fmtTimeShort(ghAmEnd)} · ${fmtTimeShort(ghPmStart)}–${fmtTimeShort(ghPmEnd)}`;$('blueHours').textContent=`${fmtTimeShort(bhAmStart)}–${fmtTimeShort(bhAmEnd)} · ${fmtTimeShort(bhPmStart)}–${fmtTimeShort(bhPmEnd)}`;goldenBlueInfo={bhAmStart,ghAmStart,ghAmEnd,ghPmStart,ghPmEnd,bhPmStart,bhPmEnd};
+  if(nextEvent){$('nextEventLabel').textContent=nextEventLabel;$('nextEventTime').textContent=fmtTimeShort(nextEvent);let diffMs=Math.max(0,nextEvent.getTime()-t.getTime()),totalSeconds=Math.floor(diffMs/1000),h=Math.floor(totalSeconds/3600),m=Math.floor((totalSeconds%3600)/60),s=totalSeconds%60;$('countdownHms').textContent=`${pad2(h)}:${pad2(m)}:${pad2(s)}`;$('countdownText').textContent=`in ${h?h+'h ':''}${m}m`.trim();$('nextEventNote').textContent=`${nextEventLabel} at ${fmtTime(nextEvent)} on ${fmtDateNice(nextEvent)}.`;}
+  setPhase(t);updateDaylightBar(t);updateSeasonsUI();updateCalibrationStatus();
+}
+
+function initViews(){
+  const buttons=Array.from(document.querySelectorAll('nav.seg button')),views={sun:$('view-sun'),seasons:$('view-seasons')};
+  function show(name){buttons.forEach(b=>b.classList.toggle('active',b.dataset.view===name));Object.entries(views).forEach(([k,el])=>el.classList.toggle('active',k===name));}
+  buttons.forEach(b=>b.addEventListener('click',()=>show(b.dataset.view)));
+}
+function openDrawer(){ $('drawer').classList.add('open');$('drawerBackdrop').classList.add('open');$('drawer').setAttribute('aria-hidden','false'); }
+function closeDrawer(){ $('drawer').classList.remove('open');$('drawerBackdrop').classList.remove('open');$('drawer').setAttribute('aria-hidden','true'); }
+
+window.addEventListener('DOMContentLoaded',()=>{
+  loadCoords();loadHorizonOffset();syncForm();initViews();
+  $('settingsBtn').addEventListener('click',openDrawer);$('closeDrawer').addEventListener('click',closeDrawer);$('drawerBackdrop').addEventListener('click',closeDrawer);
+  $('latHemi').addEventListener('click',()=>{$('latHemi').textContent=$('latHemi').textContent==='N'?'S':'N';});$('lngHemi').addEventListener('click',()=>{$('lngHemi').textContent=$('lngHemi').textContent==='E'?'W':'E';});
+  $('applyBtn').addEventListener('click',applyFromForm);$('gpsBtn').addEventListener('click',initGPS);$('calibrateSunriseBtn').addEventListener('click',calibrateToRealSunrise);$('calibrateSunsetBtn').addEventListener('click',calibrateToRealSunset);
+  recomputeSeasonData();const t=now();recomputeSunState(t);updateAll(t);
+  setInterval(()=>{const t=now();recomputeSunState(t);updateAll(t);},250);
+});
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>

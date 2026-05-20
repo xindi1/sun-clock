@@ -1,0 +1,29 @@
+{
+  "name": "Sun Clock",
+  "short_name": "Sun Clock",
+  "description": "An ambient solar time instrument built around sunrise, sunset, daylight, and the arc of the year.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "dir": "ltr",
+  "lang": "en-US",
+  "background_color": "#07111f",
+  "theme_color": "#07111f",
+  "categories": ["utilities", "productivity"],
+  "icons": [
+    {
+      "src": "sunclock-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "sunclock-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
